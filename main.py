@@ -16,17 +16,37 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from engines.data_engine import DataEngine
 from engines.backtest_engine import BacktestEngine
+
+# Import recipes
 from recipes.sample_recipe import SampleRecipe
+from recipes.rsi_recipe import RSIRecipe
+from recipes.macd_ema_recipe import MACDEMARecipe
+from recipes.bollinger_rsi_recipe import BollingerRSIRecipe
+from recipes.multi_timeframe_recipe import MultiTimeframeRecipe
+
+# Import strategies
 from strategies.sample_sma_strategy import SampleSMAStrategy
+from strategies.rsi_strategy import RSIStrategy
+from strategies.macd_ema_strategy import MACDEMAStrategy
+from strategies.bollinger_rsi_strategy import BollingerRSIStrategy
+from strategies.multi_timeframe_strategy import MultiTimeframeMomentumStrategy
 
 
 # Registry mapping names to classes
 RECIPE_REGISTRY = {
     'sample': SampleRecipe,
+    'rsi': RSIRecipe,
+    'macd_ema': MACDEMARecipe,
+    'bollinger_rsi': BollingerRSIRecipe,
+    'multi_timeframe': MultiTimeframeRecipe,
 }
 
 STRATEGY_REGISTRY = {
     'sample_sma': SampleSMAStrategy,
+    'rsi': RSIStrategy,
+    'macd_ema': MACDEMAStrategy,
+    'bollinger_rsi': BollingerRSIStrategy,
+    'multi_timeframe': MultiTimeframeMomentumStrategy,
 }
 
 
