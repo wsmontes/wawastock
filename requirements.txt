@@ -1,6 +1,7 @@
 # Core dependencies
 backtrader
 pandas
+pandas-ta
 pyarrow
 duckdb
 loguru

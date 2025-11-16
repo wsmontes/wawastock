@@ -47,12 +47,15 @@ class DataEngine(BaseEngine):
     - Multiple data sources (Yahoo, Binance, Alpaca, CCXT)
     - Organized Parquet storage with DuckDB indexing
     - Automatic fetching of missing data
+    - Automatic technical indicators calculation with pandas-ta
     """
     
     def __init__(
         self, 
         db_path: str = "data/trader.duckdb",
-        use_cache: bool = True
+        use_cache: bool = True,
+        auto_indicators: bool = True,
+        indicator_set: str = 'standard'
     ):
         """
         Initialize the DataEngine.
@@ -60,10 +63,20 @@ class DataEngine(BaseEngine):
         Args:
             db_path: Path to DuckDB database file
             use_cache: Enable local-first caching (recommended)
+            auto_indicators: Automatically calculate technical indicators (default: True)
+            indicator_set: Which indicators to calculate: 'minimal', 'standard', or 'full'
         """
         super().__init__()
         self.db_path = db_path
         self.use_cache = use_cache
+        self.auto_indicators = auto_indicators
+        
+        # Initialize indicators engine if enabled
+        if auto_indicators:
+            from .indicators_engine import IndicatorsEngine
+            self.indicators_engine = IndicatorsEngine(indicator_set=indicator_set)
+        else:
+            self.indicators_engine = None
         
         # Initialize local data store (cache)
         if use_cache:
@@ -141,7 +154,7 @@ class DataEngine(BaseEngine):
             source_normalized = f"CCXT_{exchange_id.upper()}"
         
         # Use LocalDataStore to get data (with automatic caching)
-        return self.store.get_ohlcv(
+        df = self.store.get_ohlcv(
             source=source_normalized,
             symbol=symbol,
             timeframe=timeframe,
@@ -149,6 +162,38 @@ class DataEngine(BaseEngine):
             end=end or pd.Timestamp.now().strftime('%Y-%m-%d'),
             client=client
         )
+        
+        # Calculate technical indicators if enabled and data was fetched
+        if self.auto_indicators and self.indicators_engine and df is not None and not df.empty:
+            try:
+                # Check if indicators already exist
+                ohlcv_cols = {'open', 'high', 'low', 'close', 'volume', 'timestamp', 'source', 'symbol', 'timeframe'}
+                existing_indicators = [col for col in df.columns if col not in ohlcv_cols]
+                
+                if len(existing_indicators) == 0:
+                    self.logger.info("Calculating technical indicators for cached data...")
+                    
+                    # Prepare dataframe for indicators calculation
+                    df_calc = df[['open', 'high', 'low', 'close', 'volume']].copy()
+                    df_calc = self.indicators_engine.add_indicators(df_calc)
+                    
+                    # Merge indicators back to original dataframe
+                    for col in df_calc.columns:
+                        if col not in ['open', 'high', 'low', 'close', 'volume']:
+                            df[col] = df_calc[col]
+                    
+                    # Save updated data with indicators back to cache
+                    # Use the internal store's save_data method
+                    source_path = self.store.SOURCE_MAP.get(source_normalized, source_normalized.lower())
+                    try:
+                        self.store.store.save_data(df, source_path, symbol, timeframe)
+                        self.logger.info(f"✓ Saved data with indicators to cache")
+                    except Exception as save_error:
+                        self.logger.warning(f"Could not save indicators to cache: {save_error}")
+            except Exception as e:
+                self.logger.warning(f"Could not calculate indicators: {e}")
+        
+        return df
     
     def _get_client(self, source: str, **params):
         """Get or create client for a data source."""
@@ -289,9 +334,50 @@ class DataEngine(BaseEngine):
                             if col not in df.columns:
                                 raise ValueError(f"Missing required column: {col}")
                         
+                        # Calculate technical indicators if enabled
+                        if self.auto_indicators and self.indicators_engine:
+                            try:
+                                df = self.indicators_engine.add_indicators(df)
+                                # Save to processed file with indicators
+                                df_save = df.reset_index()
+                                df_save.to_parquet(parquet_path, index=False, compression='snappy')
+                                self.logger.info(f"Saved processed data with indicators to {parquet_path}")
+                            except Exception as e:
+                                self.logger.warning(f"Could not calculate indicators: {e}")
+                        
                         return df
                 except Exception as e:
                     self.logger.warning(f"Could not load from cache: {e}")
+            
+            # If cache failed or not enabled, try downloading from Yahoo
+            self.logger.info(f"Attempting to download {symbol} from Yahoo Finance...")
+            try:
+                df = self.fetch_from_source(
+                    source='yahoo',
+                    symbol=symbol,
+                    start=start or '2020-01-01',
+                    end=end or pd.Timestamp.now().strftime('%Y-%m-%d'),
+                    interval='1d',
+                    save=True
+                )
+                if not df.empty:
+                    console.print(f"[green]✓[/green] Downloaded and saved {len(df)} bars")
+                    
+                    # Ensure datetime index format (fetch_from_source saves with datetime index)
+                    # But if returned df still has timestamp column, convert it
+                    if 'timestamp' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['timestamp'], errors='coerce')
+                        df = df.drop('timestamp', axis=1).set_index('datetime')
+                    elif 'datetime' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+                        df = df.set_index('datetime')
+                    elif not isinstance(df.index, pd.DatetimeIndex):
+                        df.index = pd.to_datetime(df.index, errors='coerce')
+                        df.index.name = 'datetime'
+                    
+                    return df
+            except Exception as e:
+                self.logger.error(f"Failed to download data: {e}")
             
             raise FileNotFoundError(f"Data file not found: {parquet_path}")
         
@@ -316,13 +402,33 @@ class DataEngine(BaseEngine):
         # Execute query and return as pandas DataFrame
         df = conn.execute(query).df()
         
+        # Remove index column if it exists (artifact from save)
+        if 'index' in df.columns:
+            df.drop('index', axis=1, inplace=True)
+        
         # Ensure datetime is properly formatted and standardize column name
         if 'timestamp' in df.columns:
-            df['datetime'] = pd.to_datetime(df['timestamp'])
+            df['datetime'] = pd.to_datetime(df['timestamp'], unit='s', errors='coerce')
+            if df['datetime'].isna().all():
+                # If all NaN, try without unit
+                df['datetime'] = pd.to_datetime(df['timestamp'], errors='coerce')
             df.drop('timestamp', axis=1, inplace=True)
         if 'datetime' in df.columns:
-            df['datetime'] = pd.to_datetime(df['datetime'])
+            # Force datetime conversion - handles integers, strings, etc
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
             df.set_index('datetime', inplace=True)
+        
+        # Calculate technical indicators if enabled and not already present
+        if self.auto_indicators and self.indicators_engine and not df.empty:
+            try:
+                original_cols = len(df.columns)
+                df = self.indicators_engine.add_indicators(df)
+                # Only save if new indicators were added
+                if len(df.columns) > original_cols:
+                    df.to_parquet(parquet_path, compression='snappy', index=True)
+                    self.logger.info(f"Updated {parquet_path} with technical indicators")
+            except Exception as e:
+                self.logger.warning(f"Could not calculate indicators: {e}")
         
         return df
     
@@ -358,7 +464,7 @@ class DataEngine(BaseEngine):
         if source.lower() == 'yahoo':
             if self._yahoo is None:
                 self._yahoo = YahooDataSource()
-            df = self._yahoo.fetch_ohlcv(symbol, start, end, interval)
+            df = self._yahoo.fetch_ohlcv(symbol, interval, start, end)
         
         elif source.lower() == 'binance':
             if self._binance is None:
@@ -399,6 +505,14 @@ class DataEngine(BaseEngine):
                 "Supported: yahoo, binance, alpaca, ccxt"
             )
         
+        # Calculate technical indicators if enabled
+        if self.auto_indicators and self.indicators_engine and df is not None and not df.empty:
+            try:
+                self.logger.info("Calculating technical indicators...")
+                df = self.indicators_engine.add_indicators(df)
+            except Exception as e:
+                self.logger.warning(f"Could not calculate indicators: {e}")
+        
         # Save to Parquet if requested
         if save and df is not None:
             output_dir = Path("data/processed")
@@ -406,11 +520,34 @@ class DataEngine(BaseEngine):
             
             filepath = output_dir / f"{symbol.replace('/', '_')}.parquet"
             
-            # Reset index for saving (datetime as column)
-            df_save = df.reset_index()
-            df_save.to_parquet(filepath, index=False)
+            # Prepare DataFrame for saving - must have datetime index for backtrader
+            df_save = df.copy()
+            
+            # Ensure we have datetime index
+            if 'timestamp' in df_save.columns:
+                df_save['datetime'] = pd.to_datetime(df_save['timestamp'])
+                df_save = df_save.set_index('datetime')
+                df_save = df_save.drop('timestamp', axis=1)
+            elif 'datetime' in df_save.columns:
+                df_save['datetime'] = pd.to_datetime(df_save['datetime'])
+                df_save = df_save.set_index('datetime')
+            elif df_save.index.name != 'datetime':
+                # If index is already datetime but not named
+                df_save.index = pd.to_datetime(df_save.index)
+                df_save.index.name = 'datetime'
+            
+            # Save with datetime index
+            df_save.to_parquet(filepath, compression='snappy', index=True)
             
             console.print(f"[green]✓[/green] Saved to {filepath}")
+            
+            # Log indicator columns if present
+            indicator_cols = [col for col in df.columns if any(
+                pattern in col.upper() 
+                for pattern in ['SMA_', 'EMA_', 'RSI', 'MACD', 'BBL_', 'BBM_', 'BBU_', 'ATR', 'OBV', 'VWAP']
+            )]
+            if indicator_cols:
+                console.print(f"[cyan]✓[/cyan] Added {len(indicator_cols)} technical indicators")
         
         return df
     
