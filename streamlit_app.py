@@ -96,19 +96,19 @@ with st.sidebar:
     strategy_params = {}
     params = bridge.get_strategy_params(recipe)
     
-    for name, info in params.items():
-        if isinstance(info['default'], bool):
-            strategy_params[name] = st.checkbox(name.replace('_', ' ').title(), value=info['default'])
-        elif isinstance(info['default'], int):
+    for name, default_value in params.items():
+        if isinstance(default_value, bool):
+            strategy_params[name] = st.checkbox(name.replace('_', ' ').title(), value=default_value)
+        elif isinstance(default_value, int):
             strategy_params[name] = st.number_input(
                 name.replace('_', ' ').title(),
-                value=info['default'],
+                value=default_value,
                 step=1
             )
-        elif isinstance(info['default'], float):
+        elif isinstance(default_value, float):
             strategy_params[name] = st.number_input(
                 name.replace('_', ' ').title(),
-                value=info['default'],
+                value=default_value,
                 step=0.1,
                 format="%.2f"
             )
