@@ -84,6 +84,36 @@ class BacktestEngine(BaseEngine):
             - return_pct: Return percentage
             - analyzers: Dictionary of analyzer results
         """
+        # Validate data
+        if data_df.empty:
+            raise ValueError("❌ Cannot run backtest: DataFrame is empty")
+        
+        min_bars_required = 250  # Conservative minimum for most indicators
+        if len(data_df) < min_bars_required:
+            print(f"\n⚠️  WARNING: Dataset has only {len(data_df)} bars")
+            print(f"   Recommended minimum: {min_bars_required} bars")
+            print(f"   Strategy may not have enough data for indicators to initialize properly")
+            print(f"   Consider using a longer time period for more reliable results\n")
+            
+            # Check if we have at least bare minimum
+            if len(data_df) < 50:
+                raise ValueError(
+                    f"❌ Insufficient data: {len(data_df)} bars\n"
+                    f"   Minimum required: 50 bars\n"
+                    f"   Please use a longer time period (e.g., --start 2023-01-01 --end 2023-12-31)"
+                )
+        
+        # Validate required columns
+        required_cols = ['open', 'high', 'low', 'close', 'volume']
+        missing_cols = [col for col in required_cols if col not in data_df.columns]
+        if missing_cols:
+            raise ValueError(f"❌ Missing required columns: {missing_cols}")
+        
+        # Check for NaN values
+        if data_df[required_cols].isnull().any().any():
+            print("⚠️  Warning: Data contains NaN values, filling forward...")
+            data_df = data_df.ffill().bfill()
+        
         # Create Cerebro
         cerebro = self.create_cerebro()
         
@@ -110,7 +140,12 @@ class BacktestEngine(BaseEngine):
         
         # Run backtest
         print(f"Starting Portfolio Value: ${initial_value:,.2f}")
-        results = cerebro.run()
+        print(f"Running backtest with {len(data_df)} bars...")
+        
+        try:
+            results = cerebro.run()
+        except Exception as e:
+            raise RuntimeError(f"❌ Backtest execution failed: {str(e)}")
         
         # Get final value
         final_value = cerebro.broker.getvalue()

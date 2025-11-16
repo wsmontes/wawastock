@@ -25,8 +25,11 @@ class BaseStrategy(bt.Strategy):
             txt: Text to log
             dt: Optional datetime (uses current data datetime if not provided)
         """
-        dt = dt or self.datas[0].datetime.date(0)
-        print(f'{dt.isoformat()} {txt}')
+        # Disabled by default to improve performance
+        # Uncomment the lines below to enable verbose logging
+        # dt = dt or self.datas[0].datetime.date(0)
+        # print(f'{dt.isoformat()} {txt}')
+        pass
     
     def notify_order(self, order):
         """

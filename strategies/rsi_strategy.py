@@ -38,30 +38,20 @@ class RSIStrategy(BaseStrategy):
         """Initialize strategy indicators."""
         self.dataclose = self.datas[0].close
         self.order = None
-        self.buy_price = None
-        self.stop_loss_price = None
         
         # RSI indicator
-        self.rsi = bt.indicators.RelativeStrengthIndex(
-            self.datas[0],
+        self.rsi = bt.indicators.RSI(
+            self.datas[0].close,
             period=self.params.rsi_period
         )
-        
-        # Track crossovers for cleaner signals
-        self.oversold_cross = bt.indicators.CrossOver(self.rsi, self.params.oversold)
-        self.overbought_cross = bt.indicators.CrossOver(self.params.overbought, self.rsi)
     
     def notify_order(self, order):
         """Track order execution."""
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.buy_price = order.executed.price
-                self.stop_loss_price = self.buy_price * (1 - self.params.stop_loss_pct)
-                self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}, Stop Loss: {self.stop_loss_price:.2f}')
+                self.log(f'BUY EXECUTED, Price: {order.executed.price:.2f}')
             elif order.issell():
                 self.log(f'SELL EXECUTED, Price: {order.executed.price:.2f}')
-                self.buy_price = None
-                self.stop_loss_price = None
             
         self.order = None
     
@@ -70,21 +60,14 @@ class RSIStrategy(BaseStrategy):
         if self.order:
             return
         
-        # Check for stop loss
-        if self.position:
-            if self.dataclose[0] < self.stop_loss_price:
-                self.log(f'STOP LOSS HIT, RSI: {self.rsi[0]:.2f}, Price: {self.dataclose[0]:.2f}')
-                self.order = self.sell()
-                return
-        
-        # Entry logic
+        # Entry logic - simple RSI levels
         if not self.position:
-            if self.oversold_cross > 0:  # RSI crossed above oversold
-                self.log(f'BUY SIGNAL, RSI: {self.rsi[0]:.2f}, Price: {self.dataclose[0]:.2f}')
+            if self.rsi[0] < self.params.oversold:
+                self.log(f'BUY SIGNAL, RSI: {self.rsi[0]:.2f}')
                 self.order = self.buy()
         
-        # Exit logic
+        # Exit logic - simple RSI levels
         else:
-            if self.overbought_cross > 0:  # RSI crossed below overbought
-                self.log(f'SELL SIGNAL, RSI: {self.rsi[0]:.2f}, Price: {self.dataclose[0]:.2f}')
+            if self.rsi[0] > self.params.overbought:
+                self.log(f'SELL SIGNAL, RSI: {self.rsi[0]:.2f}')
                 self.order = self.sell()
