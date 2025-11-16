@@ -130,27 +130,19 @@ def run_recipe_programmatic(
     if df is None or df.empty:
         raise ValueError(f"No data available for {symbol}")
     
-    # Get the strategy class from the recipe
-    # This is a bit hacky but necessary since recipes don't return results
-    strategy_cls = None
-    for name, strat_cls in STRATEGY_REGISTRY.items():
-        if name in recipe_name or recipe_cls.__name__.replace('Recipe', '').lower() in name:
-            strategy_cls = strat_cls
-            break
+    # Get the strategy class from the recipe metadata (preferred)
+    strategy_cls = getattr(recipe, 'strategy_cls', None) or getattr(recipe_cls, 'strategy_cls', None)
     
+    # Fallback to registry lookup when metadata is missing
     if strategy_cls is None:
-        # Try to get from recipe mapping
-        recipe_strategy_map = {
-            'sample': SampleSMAStrategy,
-            'rsi': RSIStrategy,
-            'macd_ema': MACDEMAStrategy,
-            'bollinger_rsi': BollingerRSIStrategy,
-            'multi_timeframe': MultiTimeframeMomentumStrategy,
-        }
-        strategy_cls = recipe_strategy_map.get(recipe_name)
+        strategy_cls = STRATEGY_REGISTRY.get(recipe_name)
     
+    # If still unresolved, raise helpful error
     if strategy_cls is None:
-        raise ValueError(f"Could not determine strategy for recipe '{recipe_name}'")
+        raise ValueError(
+            "Could not determine strategy for recipe "
+            f"'{recipe_name}'. Set 'strategy_cls' on the recipe class or update STRATEGY_REGISTRY."
+        )
     
     # Run backtest and get results
     results = backtest_engine.run_backtest(

@@ -6,9 +6,13 @@ import pytest
 import pandas as pd
 import backtrader as bt
 from datetime import datetime, timedelta
+from typing import Any, cast
+
+bt = cast(Any, bt)
 
 from strategies.rsi_strategy import RSIStrategy
 from strategies.sample_sma_strategy import SampleSMAStrategy
+from strategies.multi_timeframe_strategy import MultiTimeframeMomentumStrategy
 
 
 class TestRSIStrategy:
@@ -52,7 +56,7 @@ class TestRSIStrategy:
         df = df.set_index('timestamp')
         
         # Add to cerebro
-        data = bt.feeds.PandasData(dataname=df)
+        data = bt.feeds.PandasData(dataname=df)  # type: ignore[arg-type]
         cerebro.adddata(data)
         
         # Run
@@ -66,7 +70,6 @@ class TestRSIStrategy:
         # Should complete without errors
         assert results is not None
         assert end_value > 0
-
 
 class TestSampleSMAStrategy:
     """Test cases for Sample SMA Strategy."""
@@ -93,7 +96,7 @@ class TestSampleSMAStrategy:
         df = df.set_index('timestamp')
         
         # Add to cerebro
-        data = bt.feeds.PandasData(dataname=df)
+        data = bt.feeds.PandasData(dataname=df)  # type: ignore[arg-type]
         cerebro.adddata(data)
         
         # Run
@@ -123,7 +126,7 @@ class TestStrategyIntegration:
             df = sample_ohlcv_data.copy()
             df = df.set_index('timestamp')
             
-            data = bt.feeds.PandasData(dataname=df)
+            data = bt.feeds.PandasData(dataname=df)  # type: ignore[arg-type]
             cerebro.adddata(data)
             
             cerebro.broker.setcash(100000)
@@ -142,3 +145,52 @@ class TestStrategyIntegration:
         assert len(results) == 2
         for name, result in results.items():
             assert result['end'] > 0
+
+
+class TestMultiTimeframeStrategy:
+    """Tests for advanced multi-timeframe strategy."""
+
+    def test_initialization(self):
+        """Strategy should register without errors."""
+        cerebro = bt.Cerebro()
+        cerebro.addstrategy(MultiTimeframeMomentumStrategy)
+        assert len(cerebro.strats) == 1
+
+    def test_runs_on_sample_data(self, sample_ohlcv_data):
+        """Strategy should run on sample data without attribute errors."""
+        cerebro = bt.Cerebro()
+        cerebro.addstrategy(
+            MultiTimeframeMomentumStrategy,
+            allow_pyramid=False,
+            volume_threshold=0.0,
+            risk_per_trade=0.005,
+            fast_ema=8,
+            slow_ema=21,
+            trend_ema=55,
+            volume_ma_period=10,
+            adx_period=10,
+            atr_period=10,
+        )
+
+        df = sample_ohlcv_data.copy().set_index('timestamp')
+        data = bt.feeds.PandasData(dataname=df)  # type: ignore[arg-type]
+        cerebro.adddata(data)
+        cerebro.broker.setcash(50000)
+        cerebro.run()
+        assert cerebro.broker.getvalue() > 0
+
+class TestMultiTimeframeHelpers:
+    """Unit tests for MultiTimeframeMomentumStrategy helper methods."""
+
+    def test_safe_divide_handles_zero_denominator(self):
+        """_safe_divide should fallback to default when denominator is zero."""
+        helper = MultiTimeframeMomentumStrategy._safe_divide
+        assert helper(10, 2) == 5
+        assert helper(10, 0) == 0
+        assert helper(10, 0, default=1.5) == 1.5
+
+    def test_average_entry_handles_empty_list(self):
+        """_average_entry should use fallback when prices list empty."""
+        helper = MultiTimeframeMomentumStrategy._average_entry
+        assert helper([100, 110], 90) == 105
+        assert helper([], 95) == 95

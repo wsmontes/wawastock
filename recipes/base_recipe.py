@@ -8,6 +8,10 @@ Recipes are high-level workflows that coordinate:
 """
 
 from abc import ABC, abstractmethod
+from typing import Optional, Type
+
+import backtrader as bt
+
 from engines.data_engine import DataEngine
 from engines.backtest_engine import BacktestEngine
 
@@ -26,6 +30,9 @@ class BaseRecipe(ABC):
         backtest_engine: Engine for running backtests
     """
     
+    # Strategy class used by the recipe's backtest
+    strategy_cls: Optional[Type[bt.Strategy]] = None
+
     def __init__(
         self, 
         data_engine: DataEngine,

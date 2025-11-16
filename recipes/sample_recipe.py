@@ -22,6 +22,8 @@ class SampleRecipe(BaseRecipe):
     - Present results to the user
     """
     
+    strategy_cls = SampleSMAStrategy
+
     def __init__(self, data_engine, backtest_engine):
         """Initialize recipe with engines."""
         super().__init__(data_engine, backtest_engine)

@@ -21,6 +21,8 @@ class MACDEMARecipe(BaseRecipe):
     improved win rate and dynamic position sizing.
     """
     
+    strategy_cls = MACDEMAStrategy
+
     def __init__(self, data_engine, backtest_engine):
         """Initialize recipe with engines."""
         super().__init__(data_engine, backtest_engine)

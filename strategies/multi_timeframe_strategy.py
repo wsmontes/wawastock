@@ -11,8 +11,13 @@ This sophisticated strategy implements institutional-grade techniques:
 - Risk management with maximum drawdown controls
 """
 
+from typing import Any, cast
+
 import backtrader as bt
 from .base_strategy import BaseStrategy
+
+bt = cast(Any, bt)
+indicators = cast(Any, bt.indicators)
 
 
 class MultiTimeframeMomentumStrategy(BaseStrategy):
@@ -68,7 +73,7 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
         5. Fast EMA crosses below Slow EMA
     """
     
-    params = (
+    params: Any = (
         # Trend
         ('fast_ema', 21),
         ('slow_ema', 55),
@@ -96,6 +101,24 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
         ('volume_threshold', 1.2),
     )
     
+    @staticmethod
+    def _safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
+        """Divide while protecting against zero denominators."""
+        if denominator is None:
+            return default
+        if isinstance(denominator, (int, float)):
+            return numerator / denominator if abs(denominator) > 1e-12 else default
+        try:
+            denom_value = float(denominator)
+        except (TypeError, ValueError):
+            return default
+        return numerator / denom_value if abs(denom_value) > 1e-12 else default
+
+    @staticmethod
+    def _average_entry(prices, fallback: float) -> float:
+        """Compute average entry price with fallback when list is empty."""
+        return (sum(prices) / len(prices)) if prices else fallback
+    
     def __init__(self):
         """Initialize strategy indicators."""
         super().__init__()
@@ -110,25 +133,24 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
         self.highest_price = None
         
         # EMAs for trend
-        self.fast_ema = bt.indicators.EMA(self.datas[0], period=self.params.fast_ema)
-        self.slow_ema = bt.indicators.EMA(self.datas[0], period=self.params.slow_ema)
-        self.trend_ema = bt.indicators.EMA(self.datas[0], period=self.params.trend_ema)
+        self.fast_ema = indicators.EMA(self.datas[0], period=self.params.fast_ema)
+        self.slow_ema = indicators.EMA(self.datas[0], period=self.params.slow_ema)
+        self.trend_ema = indicators.EMA(self.datas[0], period=self.params.trend_ema)
         
         # EMA crossover
-        self.ema_cross = bt.indicators.CrossOver(self.fast_ema, self.slow_ema)
+        self.ema_cross = indicators.CrossOver(self.fast_ema, self.slow_ema)
         
         # RSI for momentum
-        self.rsi = bt.indicators.RelativeStrengthIndex(period=self.params.rsi_period)
+        self.rsi = indicators.RelativeStrengthIndex(period=self.params.rsi_period)
         
         # ADX for trend strength
-        self.adx = bt.indicators.AverageDirectionalMovementIndex(period=self.params.adx_period)
+        self.adx = indicators.AverageDirectionalMovementIndex(period=self.params.adx_period)
         
         # ATR for volatility-based stops
-        self.atr = bt.indicators.ATR(period=self.params.atr_period)
+        self.atr = indicators.ATR(period=self.params.atr_period)
         
         # Volume analysis
-        self.volume_sma = bt.indicators.SMA(self.datas[0].volume, period=self.params.volume_ma_period)
-        self.volume_ratio = self.datas[0].volume / self.volume_sma
+        self.volume_sma = indicators.SMA(self.datas[0].volume, period=self.params.volume_ma_period)
         
     def notify_order(self, order):
         """Track order execution."""
@@ -159,7 +181,7 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
                             f'P&L: {pnl_pct:.2f}%, Bars Held: {bars_held}')
                 
                 # Reset position tracking if fully closed
-                if order.executed.size >= self.position.size:
+                if self.position.size <= 0:
                     self.entry_prices = []
                     self.entry_bar = None
                     self.pyramid_count = 0
@@ -183,9 +205,13 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
             if self.dataclose[0] > self.highest_price:
                 self.highest_price = self.dataclose[0]
             
-            avg_entry = sum(self.entry_prices) / len(self.entry_prices)
-            current_profit_atr = (self.dataclose[0] - avg_entry) / self.atr[0]
-            bars_held = len(self) - self.entry_bar
+            avg_entry = self._average_entry(
+                self.entry_prices,
+                getattr(self.position, 'price', self.dataclose[0])
+            )
+            atr_value = self.atr[0]
+            current_profit_atr = self._safe_divide(self.dataclose[0] - avg_entry, atr_value)
+            bars_held = (len(self) - self.entry_bar) if self.entry_bar is not None else 0
             
             # Exit 1: Profit target
             if current_profit_atr >= self.params.profit_target_atr:
@@ -222,14 +248,21 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
             
             # Pyramiding logic
             if self.params.allow_pyramid and self.pyramid_count < self.params.pyramid_units:
-                if self.last_pyramid_price:
-                    price_move = (self.dataclose[0] - self.last_pyramid_price) / self.last_pyramid_price
+                if self.last_pyramid_price and self.last_pyramid_price > 0:
+                    price_move = self._safe_divide(self.dataclose[0] - self.last_pyramid_price, self.last_pyramid_price)
                     if price_move >= self.params.pyramid_spacing:
                         # Calculate pyramid size (smaller than initial)
                         equity = self.broker.getvalue()
                         risk_amount = equity * self.params.risk_per_trade * 0.5  # Half size
+                        if risk_amount <= 0:
+                            return
                         stop_distance = self.atr[0] * 2
-                        size = risk_amount / stop_distance
+                        if stop_distance <= 0:
+                            self.log('Skipping pyramid entry due to zero ATR distance')
+                            return
+                        size = self._safe_divide(risk_amount, stop_distance)
+                        if size <= 0:
+                            return
                         
                         self.log(f'PYRAMID ENTRY, Price: {self.dataclose[0]:.2f}, Move: {price_move*100:.1f}%')
                         self.order = self.buy(size=size)
@@ -254,22 +287,36 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
                 return
             
             # Condition 5: Volume confirmation
-            if self.volume_ratio[0] < self.params.volume_threshold:
+            volume_ma = self.volume_sma[0]
+            volume_ratio = self._safe_divide(self.datas[0].volume[0], volume_ma)
+            if volume_ratio < self.params.volume_threshold:
                 return
             
             # All conditions met - calculate position size
             equity = self.broker.getvalue()
-            risk_amount = equity * self.params.risk_per_trade
+            risk_amount = max(equity * self.params.risk_per_trade, 0)
+            if risk_amount <= 0:
+                return
             
             # ATR-based position sizing (stop at 2x ATR)
             stop_distance = self.atr[0] * 2
-            size = risk_amount / stop_distance
+            if stop_distance <= 0:
+                self.log('Skipping entry due to zero ATR distance')
+                return
+            size = self._safe_divide(risk_amount, stop_distance)
+            if size <= 0:
+                return
             
             # Apply maximum position size constraint
-            max_size = (equity * self.params.max_position_size) / self.dataclose[0]
+            price = self.dataclose[0]
+            if price <= 0:
+                return
+            max_size = (equity * self.params.max_position_size) / price
             size = min(size, max_size)
             
-            self.log(f'BUY SIGNAL, Price: {self.dataclose[0]:.2f}, '
-                    f'ADX: {self.adx[0]:.1f}, RSI: {self.rsi[0]:.1f}, '
-                    f'Vol Ratio: {self.volume_ratio[0]:.2f}')
+            self.log(
+                f'BUY SIGNAL, Price: {self.dataclose[0]:.2f}, '
+                f'ADX: {self.adx[0]:.1f}, RSI: {self.rsi[0]:.1f}, '
+                f'Vol Ratio: {volume_ratio:.2f}'
+            )
             self.order = self.buy(size=size)

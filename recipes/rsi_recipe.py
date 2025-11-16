@@ -18,6 +18,8 @@ class RSIRecipe(BaseRecipe):
     with stop loss protection.
     """
     
+    strategy_cls = RSIStrategy
+
     def __init__(self, data_engine, backtest_engine):
         """Initialize recipe with engines."""
         super().__init__(data_engine, backtest_engine)

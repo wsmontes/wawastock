@@ -19,6 +19,8 @@ class MultiTimeframeRecipe(BaseRecipe):
     exit management.
     """
     
+    strategy_cls = MultiTimeframeMomentumStrategy
+
     def __init__(self, data_engine, backtest_engine):
         """Initialize recipe with engines."""
         super().__init__(data_engine, backtest_engine)
@@ -32,10 +34,23 @@ class MultiTimeframeRecipe(BaseRecipe):
         fast_ema: int = 21,
         slow_ema: int = 55,
         trend_ema: int = 200,
+        rsi_period: int = 14,
+        rsi_entry_min: int = 50,
+        adx_period: int = 14,
         adx_threshold: int = 25,
+        atr_period: int = 14,
         risk_per_trade: float = 0.015,
+        max_position_size: float = 0.3,
         allow_pyramid: bool = True,
-        pyramid_units: int = 3
+        pyramid_units: int = 3,
+        pyramid_spacing: float = 0.02,
+        profit_target_atr: float = 3.0,
+        trail_start_atr: float = 2.0,
+        trail_pct: float = 0.02,
+        max_hold_bars: int = 50,
+        volume_ma_period: int = 20,
+        volume_threshold: float = 1.2,
+        **extra_strategy_kwargs
     ):
         """
         Execute the Multi-Timeframe Momentum recipe.
@@ -47,11 +62,26 @@ class MultiTimeframeRecipe(BaseRecipe):
             fast_ema: Fast EMA period (default: 21)
             slow_ema: Slow EMA period (default: 55)
             trend_ema: Trend filter EMA (default: 200)
+            rsi_period: RSI period (default: 14)
+            rsi_entry_min: Minimum RSI for entries (default: 50)
+            adx_period: ADX calculation period (default: 14)
             adx_threshold: Minimum ADX for entry (default: 25)
+            atr_period: ATR period for sizing (default: 14)
             risk_per_trade: Risk per trade % (default: 0.015 = 1.5%)
+            max_position_size: Max % of equity per position (default: 0.3)
             allow_pyramid: Enable pyramiding (default: True)
             pyramid_units: Max pyramid entries (default: 3)
+            pyramid_spacing: % move required for next entry (default: 0.02)
+            profit_target_atr: ATR multiple for profit target (default: 3.0)
+            trail_start_atr: ATR multiple before trailing stop kicks in (default: 2.0)
+            trail_pct: Trailing stop percentage (default: 0.02)
+            max_hold_bars: Maximum bars to hold a trade (default: 50)
+            volume_ma_period: Volume moving average period (default: 20)
+            volume_threshold: Minimum volume multiple vs MA (default: 1.2)
+            extra_strategy_kwargs: Forward compatibility for new params
         """
+        allow_pyramid_bool = bool(allow_pyramid)
+        
         # Print strategy header
         self.report.print_strategy_header(
             strategy_name="Multi-Timeframe Momentum with Pyramiding",
@@ -59,10 +89,13 @@ class MultiTimeframeRecipe(BaseRecipe):
             start=start,
             end=end,
             params={
-                'ema_system': f"{fast_ema}/{slow_ema} with {trend_ema} trend filter",
-                'adx_threshold': f"{adx_threshold} (trend strength)",
-                'risk_per_trade': f"{risk_per_trade*100:.2f}%",
-                'pyramiding': f"{'Enabled' if allow_pyramid else 'Disabled'} ({pyramid_units} units)"
+                'ema_system': f"{fast_ema}/{slow_ema} w/ {trend_ema} trend",
+                'momentum': f"RSI {rsi_period} min {rsi_entry_min}",
+                'trend_strength': f"ADX {adx_period}/{adx_threshold}",
+                'risk': f"{risk_per_trade*100:.2f}% risk, max {max_position_size*100:.0f}% position",
+                'pyramiding': f"{'On' if allow_pyramid_bool else 'Off'} ({pyramid_units} units, {pyramid_spacing*100:.1f}% spacing)",
+                'targets': f"{profit_target_atr}x ATR target, {trail_pct*100:.1f}% trail",
+                'volume': f"{volume_ma_period}-MA x{volume_threshold:.2f}"
             }
         )
         
@@ -94,10 +127,23 @@ class MultiTimeframeRecipe(BaseRecipe):
             fast_ema=fast_ema,
             slow_ema=slow_ema,
             trend_ema=trend_ema,
+            rsi_period=rsi_period,
+            rsi_entry_min=rsi_entry_min,
+            adx_period=adx_period,
             adx_threshold=adx_threshold,
+            atr_period=atr_period,
             risk_per_trade=risk_per_trade,
-            allow_pyramid=allow_pyramid,
-            pyramid_units=pyramid_units
+            max_position_size=max_position_size,
+            allow_pyramid=allow_pyramid_bool,
+            pyramid_units=pyramid_units,
+            pyramid_spacing=pyramid_spacing,
+            profit_target_atr=profit_target_atr,
+            trail_start_atr=trail_start_atr,
+            trail_pct=trail_pct,
+            max_hold_bars=max_hold_bars,
+            volume_ma_period=volume_ma_period,
+            volume_threshold=volume_threshold,
+            **extra_strategy_kwargs
         )
         
         # Display results

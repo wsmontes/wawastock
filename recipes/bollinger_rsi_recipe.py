@@ -18,6 +18,8 @@ class BollingerRSIRecipe(BaseRecipe):
     mean reversion trades with ATR-based position sizing.
     """
     
+    strategy_cls = BollingerRSIStrategy
+
     def __init__(self, data_engine, backtest_engine):
         """Initialize recipe with engines."""
         super().__init__(data_engine, backtest_engine)
@@ -31,8 +33,14 @@ class BollingerRSIRecipe(BaseRecipe):
         bb_period: int = 20,
         bb_dev: float = 2.0,
         rsi_period: int = 14,
+        rsi_oversold: int = 35,
+        rsi_overbought: int = 65,
+        atr_period: int = 14,
         risk_per_trade: float = 0.02,
-        partial_take_profit: float = 0.5
+        partial_take_profit: float = 0.5,
+        profit_target_mult: float = 2.0,
+        trail_pct: float = 0.015,
+        **extra_strategy_kwargs
     ):
         """
         Execute the Bollinger + RSI recipe.
@@ -44,8 +52,14 @@ class BollingerRSIRecipe(BaseRecipe):
             bb_period: Bollinger Bands period (default: 20)
             bb_dev: BB standard deviations (default: 2.0)
             rsi_period: RSI period (default: 14)
+            rsi_oversold: RSI level for entries (default: 35)
+            rsi_overbought: RSI level for exits (default: 65)
+            atr_period: ATR period for sizing (default: 14)
             risk_per_trade: Risk per trade as % of equity (default: 0.02 = 2%)
             partial_take_profit: % to close at first target (default: 0.5 = 50%)
+            profit_target_mult: ATR multiple for profit target (default: 2.0)
+            trail_pct: Trailing stop percentage after partial profit (default: 0.015)
+            extra_strategy_kwargs: Forward compatibility for new params
         """
         # Print strategy header
         self.report.print_strategy_header(
@@ -55,9 +69,12 @@ class BollingerRSIRecipe(BaseRecipe):
             end=end,
             params={
                 'bollinger': f"{bb_period} period, {bb_dev} std dev",
-                'rsi': f"{rsi_period} period",
+                'rsi': f"{rsi_period} period ({rsi_oversold}/{rsi_overbought})",
+                'atr_period': atr_period,
                 'risk_per_trade': f"{risk_per_trade*100:.1f}%",
-                'partial_profit': f"{partial_take_profit*100:.0f}% at mid-BB"
+                'partial_profit': f"{partial_take_profit*100:.0f}% at mid-BB",
+                'trail_pct': f"{trail_pct*100:.2f}%",
+                'profit_target': f"{profit_target_mult} ATR"
             }
         )
         
@@ -89,8 +106,14 @@ class BollingerRSIRecipe(BaseRecipe):
             bb_period=bb_period,
             bb_dev=bb_dev,
             rsi_period=rsi_period,
+             rsi_oversold=rsi_oversold,
+             rsi_overbought=rsi_overbought,
+             atr_period=atr_period,
             risk_per_trade=risk_per_trade,
-            partial_take_profit=partial_take_profit
+             partial_take_profit=partial_take_profit,
+             profit_target_mult=profit_target_mult,
+             trail_pct=trail_pct,
+             **extra_strategy_kwargs
         )
         
         # Display results
