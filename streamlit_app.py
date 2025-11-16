@@ -33,35 +33,50 @@ with st.sidebar:
     
     # Symbol search
     st.subheader("Symbol")
-    search_tab, db_tab = st.tabs(["🔍 Search", "💾 Database"])
     
-    with search_tab:
-        search = st.text_input("Company name or ticker", placeholder="e.g. Apple, TSLA")
-        if search and len(search) >= 2:
-            try:
-                from yfinance import Search
-                results = Search(search, max_results=5, enable_fuzzy_query=True)
-                if results.quotes:
-                    options = []
-                    for q in results.quotes:
-                        name = q.get('shortname', q.get('longname', ''))
-                        sym = q.get('symbol', '')
-                        options.append(f"{sym} - {name}")
-                    
-                    selected = st.selectbox("Results", options, label_visibility="collapsed")
+    # Track which tab is being used
+    search = st.text_input("Company name or ticker", placeholder="e.g. Apple, TSLA", key="symbol_search")
+    
+    if search and len(search) >= 2:
+        try:
+            from yfinance import Search
+            results = Search(search, max_results=5, enable_fuzzy_query=True)
+            if results.quotes:
+                options = []
+                for q in results.quotes:
+                    name = q.get('shortname', q.get('longname', ''))
+                    sym = q.get('symbol', '')
+                    options.append(f"{sym} - {name}")
+                
+                selected = st.selectbox("Select from results", options, key="search_results")
+                if selected:
                     symbol = selected.split(' - ')[0]
-                else:
-                    st.warning("No results")
-                    symbol = search.upper()
-            except Exception as e:
-                st.error(f"Error: {e}")
-                symbol = search.upper()
-        else:
-            symbol = "AAPL"
-    
-    with db_tab:
+                    # Check if symbol changed
+                    if st.session_state.get('selected_symbol') != symbol:
+                        if 'results' in st.session_state:
+                            del st.session_state['results']
+                    st.session_state['selected_symbol'] = symbol
+                    st.session_state['symbol_source'] = 'search'
+            else:
+                st.warning("No results found")
+        except Exception as e:
+            st.error(f"Search error: {e}")
+    else:
+        # Show database selector when not searching
+        st.caption("Or select from database:")
         available = bridge.get_available_symbols()
-        symbol = st.selectbox("Available symbols", available or ["AAPL"], label_visibility="collapsed")
+        db_symbol = st.selectbox("Available symbols", available or ["AAPL"], key="db_symbols")
+        if db_symbol:
+            # Only update if not currently using search results
+            if st.session_state.get('symbol_source') != 'search' or not search:
+                if st.session_state.get('selected_symbol') != db_symbol:
+                    if 'results' in st.session_state:
+                        del st.session_state['results']
+                st.session_state['selected_symbol'] = db_symbol
+                st.session_state['symbol_source'] = 'database'
+    
+    # Get final symbol from session state
+    symbol = st.session_state.get('selected_symbol', 'AAPL')
     
     # Date range
     st.subheader("Period")
