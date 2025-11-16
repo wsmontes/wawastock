@@ -59,6 +59,10 @@ class YahooDataSource(BaseDataSource):
         """
         df = self._fetch_ohlcv_internal(symbol, start, end, timeframe)
         
+        # Return empty DataFrame if no data
+        if df.empty:
+            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
         # Convert to ExchangeClient format (timestamp column, not index)
         if isinstance(df.index, pd.DatetimeIndex):
             df = df.reset_index()
@@ -98,25 +102,30 @@ class YahooDataSource(BaseDataSource):
         print(f"  Period: {start_date or 'max'} to {end_date or 'now'}")
         print(f"  Interval: {interval}")
         
-        ticker = yf.Ticker(symbol)
-        
-        # Fetch data
-        df = ticker.history(
-            start=start_date,
-            end=end_date,
-            interval=interval,
-            auto_adjust=True  # Use adjusted close
-        )
-        
-        if df.empty:
-            raise ValueError(f"No data returned for symbol {symbol}")
-        
-        # Yahoo Finance returns: Open, High, Low, Close, Volume, Dividends, Stock Splits
-        # We only need OHLCV
-        df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
-        
-        # Rename columns to lowercase
-        df.columns = ['open', 'high', 'low', 'close', 'volume']
+        try:
+            ticker = yf.Ticker(symbol)
+            
+            # Fetch data
+            df = ticker.history(
+                start=start_date,
+                end=end_date,
+                interval=interval,
+                auto_adjust=True  # Use adjusted close
+            )
+            
+            if df.empty:
+                print(f"⚠️  No data returned for symbol {symbol}")
+                return pd.DataFrame()
+            
+            # Yahoo Finance returns: Open, High, Low, Close, Volume, Dividends, Stock Splits
+            # We only need OHLCV
+            df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
+            
+            # Rename columns to lowercase
+            df.columns = ['open', 'high', 'low', 'close', 'volume']
+        except Exception as e:
+            print(f"⚠️  Error fetching {symbol}: {e}")
+            return pd.DataFrame()
         
         # Ensure index is named 'datetime'
         df.index.name = 'datetime'
