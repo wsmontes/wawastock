@@ -1,8 +1,10 @@
-# 🚀 Quick Start
+# 🚀 Quick Start – Environment Setup
 
-## First Time Setup
+Use this guide the first time you clone the repo or whenever you need to rebuild your environment.
 
-### Mac/Linux
+## 1. Run the Setup Script
+
+### macOS / Linux
 ```bash
 ./setup.sh
 ```
@@ -12,84 +14,79 @@
 setup.bat
 ```
 
-This will:
-- ✓ Check Python version (3.8+ required)
-- ✓ Create virtual environment
-- ✓ Install all dependencies
-- ✓ Create data directories
-- ✓ Verify installation
+The script will:
 
-## Running the Application
+- ✓ Verify Python ≥ 3.8
+- ✓ Create/refresh the `venv/` virtual environment
+- ✓ Install `requirements.txt`
+- ✓ Create `data/processed`, `data/parquet`, and `logs/`
+- ✓ Validate key imports (backtrader, duckdb, pandas, Streamlit)
 
-### Streamlit Web Interface (Recommended)
+> Tip: rerun the script whenever dependencies change; it’s idempotent.
 
-**Mac/Linux:**
+## 2. Activate the Virtual Environment
+
 ```bash
-./start.sh
-```
-
-**Windows:**
-```batch
-start.bat
-```
-
-The browser will open automatically at http://localhost:8502
-
-### Command Line Interface
-
-**Mac/Linux:**
-```bash
+# macOS / Linux
 source venv/bin/activate
-python main.py recipe sample --symbol AAPL
+
+# Windows (PowerShell)
+venv\Scripts\Activate.ps1
 ```
 
-**Windows:**
-```batch
-venv\Scripts\activate.bat
-python main.py recipe sample --symbol AAPL
-```
+Keep the terminal active while running CLI commands or Streamlit.
 
-## Troubleshooting
+## 3. Launch an Interface
 
-**Virtual environment issues:**
+### Streamlit UI (recommended for demos)
+
 ```bash
-# Mac/Linux
-rm -rf venv
-./setup.sh
-
-# Windows
-rmdir /s /q venv
-setup.bat
+./start.sh        # start.bat on Windows
 ```
 
-**Package installation fails:**
+Your browser opens to http://localhost:8502 with the Backtest Runner and companion pages.
+
+### Command-line sample
+
 ```bash
-# Upgrade pip first
-python -m pip install --upgrade pip
-./setup.sh  # or setup.bat on Windows
+python main.py run-recipe --name sample --symbol AAPL --start 2022-01-01 --end 2022-12-31
 ```
 
-**DuckDB lock error:**
-- Close CLI before starting Streamlit (or vice versa)
-- Only one instance can access the database at a time
+## 4. Common Issues & Fixes
 
-## Requirements
+| Issue | Symptoms | Fix |
+|-------|----------|-----|
+| Virtualenv corruption | `ModuleNotFoundError`, odd pip state | Delete `venv/` then rerun `./setup.sh` (or `setup.bat`). |
+| Pip install failures | SSL / wheel build errors | `python -m pip install --upgrade pip` then rerun setup. |
+| DuckDB lock | "Database is locked" when running CLI + Streamlit together | Close Streamlit before running heavy CLI jobs, or stagger commands. |
+| Missing data | `FileNotFoundError: data/processed/SYMBOL.parquet` | Use `python main.py fetch-data ...` or scripts under `scripts/` to seed data. |
 
-- Python 3.8 or higher
-- pip (included with Python)
-- Internet connection (for installation)
+## 5. Requirements Checklist
 
-## Project Structure
+- Python 3.8+
+- pip (bundled with Python)
+- Internet connection for package/data downloads
+- ~2 GB disk space for sample data + env
+
+## 6. Project Landmarks
 
 ```
-wawastock/
-├── setup.sh / setup.bat    # Setup script
-├── start.sh / start.bat    # Launch script
-├── main.py                 # CLI entry point
-├── streamlit_app.py        # Web interface
-├── requirements.txt        # Dependencies
-├── engines/               # Core engines
+
+├── setup.sh / setup.bat      # Environment automation
+├── start.sh / start.bat      # Streamlit launcher
+├── main.py                   # CLI entry point
+├── engines/                  # Core engines (data, backtest, indicators, report)
+├── strategies/               # Trading strategies
+├── recipes/                  # Full workflows
+├── streamlit_pages/          # Streamlit multi-page app
+├── streamlit_components/     # Reusable UI widgets
+├── scripts/                  # Data utilities
+└── data/                     # Parquet + DuckDB storage
+```
+
+## 7. Next Steps
+
+- Head to `QUICKSTART.md` for a strategy-by-strategy guide.
+- Open `docs/STRATEGIES.md` to understand each recipe’s logic and parameters.
+- Read `docs/LOGGING.md` if you want to customize the Rich/Loguru output right away.
 ├── strategies/            # Trading strategies
-├── recipes/               # Strategy recipes
-└── data/                  # Data storage
-```

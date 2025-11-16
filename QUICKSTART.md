@@ -1,173 +1,107 @@
-# Quick Start Guide - New Strategies
+# Strategy Quick Start
 
-## Available Strategies
+This guide assumes you have already completed the environment setup in `QUICKSTART_SETUP.md`. Below is everything you need to start running, comparing, and iterating on the five bundled strategies.
 
-You now have **4 trading strategies** with increasing complexity:
+## 1. Prep Checklist
 
-1. **rsi** - Basic RSI mean reversion (beginner-friendly)
-2. **macd_ema** - Intermediary MACD + EMA trend following
-3. **bollinger_rsi** - Advanced Bollinger Bands + RSI with ATR sizing
-4. **multi_timeframe** - Maximum multi-timeframe momentum with pyramiding
+1. Activate the virtual environment (`source venv/bin/activate` on macOS/Linux or `venv\Scripts\activate` on Windows).
+2. Ensure you have at least one processed Parquet file under `data/processed/` (use `python main.py fetch-data ...` or the scripts in `scripts/`).
+3. Decide whether you want the CLI or Streamlit UI:
+   - CLI → `python main.py run-recipe ...`
+   - UI → `./start.sh` (launches Streamlit with backtest pages)
 
-## Running Strategies
+## 2. Recipe-first (Recommended)
 
-### Option 1: Using Recipes (Recommended)
-
-Recipes provide a complete workflow with defaults and formatted output:
+Recipes encapsulate data loading, indicator enrichment, backtesting, analyzers, and reporting. Run any recipe with just a symbol (defaults cover the rest):
 
 ```bash
-# Activate virtual environment first
-source venv/bin/activate
-
-# Basic RSI Strategy
 python main.py run-recipe --name rsi --symbol AAPL
-
-# Intermediary MACD + EMA Strategy
-python main.py run-recipe --name macd_ema --symbol AAPL
-
-# Advanced Bollinger + RSI Strategy
-python main.py run-recipe --name bollinger_rsi --symbol AAPL
-
-# Maximum Multi-Timeframe Strategy
-python main.py run-recipe --name multi_timeframe --symbol AAPL
+python main.py run-recipe --name macd_ema --symbol MSFT --start 2021-01-01 --end 2023-12-31
+python main.py run-recipe --name bollinger_rsi --symbol NVDA --risk_per_trade 0.03
+python main.py run-recipe --name multi_timeframe --symbol TSLA --cash 150000 --commission 0.0005
+python main.py run-recipe --name sample --symbol TEST
 ```
 
-### Option 2: Using Strategies Directly
+Each run prints a Rich-formatted report (header, parameters, data summary, analyzer metrics). Results are also logged to `logs/wawastock.log`.
 
-For more control over parameters:
+## 3. Strategy-only Runs
+
+Need bespoke parameters or want to iterate quickly? Call strategies directly:
 
 ```bash
-# RSI Strategy
-python main.py run-strategy --strategy rsi \
-    --symbol AAPL \
-    --start 2020-01-01 \
-    --end 2023-12-31
-
-# MACD + EMA Strategy
-python main.py run-strategy --strategy macd_ema \
-    --symbol MSFT \
-    --start 2021-01-01 \
-    --end 2023-12-31
-
-# Bollinger + RSI Strategy
-python main.py run-strategy --strategy bollinger_rsi \
-    --symbol NVDA \
-    --start 2022-01-01 \
-    --end 2023-12-31
-
-# Multi-Timeframe Strategy
-python main.py run-strategy --strategy multi_timeframe \
-    --symbol TSLA \
-    --start 2020-01-01 \
-    --end 2023-12-31
+python main.py run-strategy --strategy rsi --symbol AAPL --start 2020-01-01 --end 2023-12-31 --rsi_period 10 --oversold 25 --overbought 75
+python main.py run-strategy --strategy bollinger_rsi --symbol TSLA --bb_period 30 --bb_dev 2.5 --risk_per_trade 0.015
+python main.py run-strategy --strategy multi_timeframe --symbol NVDA --allow_pyramid False --adx_threshold 30
 ```
 
-## Strategy Comparison
+Strategy runs share the same analyzers as recipes; you simply control the parameter map yourself.
 
-| Strategy | Complexity | Ideal For | Key Feature |
-|----------|-----------|-----------|-------------|
-| **rsi** | ⭐ Basic | Learning | Simple mean reversion |
-| **macd_ema** | ⭐⭐ Intermediary | Trending markets | EMA filter + trailing stop |
-| **bollinger_rsi** | ⭐⭐⭐ Advanced | Volatile markets | ATR-based sizing + partial profits |
-| **multi_timeframe** | ⭐⭐⭐⭐ Maximum | Professional trading | Pyramiding + multi-layer exits |
+## 4. Strategy Matrix
 
-## Example Workflows
+| Recipe / Strategy | Level | Ideal Use Case | Key Parameters | Files |
+|-------------------|-------|----------------|----------------|-------|
+| `rsi` | ⭐ Basic | Mean reversion learners | `rsi_period`, `oversold`, `overbought`, `stop_loss_pct` | `recipes/rsi_recipe.py`, `strategies/rsi_strategy.py` |
+| `macd_ema` | ⭐⭐ Intermediate | Trending stocks / ETFs | `trend_ema`, `position_size_pct`, `trail_pct` | `recipes/macd_ema_recipe.py`, `strategies/macd_ema_strategy.py` |
+| `bollinger_rsi` | ⭐⭐⭐ Advanced | Volatile names needing ATR position sizing | `bb_period`, `bb_dev`, `risk_per_trade`, `partial_take_profit` | `recipes/bollinger_rsi_recipe.py`, `strategies/bollinger_rsi_strategy.py` |
+| `multi_timeframe` | ⭐⭐⭐⭐ Maximum | Professional momentum + pyramiding | `allow_pyramid`, `pyramid_units`, `adx_threshold`, `profit_target_atr`, `trail_pct` | `recipes/multi_timeframe_recipe.py`, `strategies/multi_timeframe_strategy.py` |
+| `sample` | Tutorial | SMA crossover baseline / onboarding | `fast_period`, `slow_period` | `recipes/sample_recipe.py`, `strategies/sample_sma_strategy.py` |
 
-### 1. Test All Strategies on AAPL
+For deeper indicator logic and tuning tips, see `docs/STRATEGIES.md`.
+
+## 5. Battle-tested Workflows
+
+### Compare strategies on the same symbol
 
 ```bash
-source venv/bin/activate
-
-# Run each strategy
-python main.py run-recipe --name rsi --symbol AAPL
-python main.py run-recipe --name macd_ema --symbol AAPL
-python main.py run-recipe --name bollinger_rsi --symbol AAPL
-python main.py run-recipe --name multi_timeframe --symbol AAPL
+python main.py run-recipe --name rsi --symbol AAPL --start 2022-01-01 --end 2023-12-31
+python main.py run-recipe --name macd_ema --symbol AAPL --start 2022-01-01 --end 2023-12-31
+python main.py run-recipe --name bollinger_rsi --symbol AAPL --start 2022-01-01 --end 2023-12-31
+python main.py run-recipe --name multi_timeframe --symbol AAPL --start 2022-01-01 --end 2023-12-31
 ```
 
-### 2. Compare Periods
+### Regime testing
 
 ```bash
-# 2020-2021 (COVID recovery)
-python main.py run-recipe --name multi_timeframe --symbol AAPL \
-    --start 2020-01-01 --end 2021-12-31
-
-# 2022-2023 (Bear to Bull)
-python main.py run-recipe --name multi_timeframe --symbol AAPL \
-    --start 2022-01-01 --end 2023-12-31
+# Pandemic rally vs. post-inflation period
+python main.py run-recipe --name multi_timeframe --symbol NVDA --start 2020-03-01 --end 2021-12-31
+python main.py run-recipe --name multi_timeframe --symbol NVDA --start 2022-01-01 --end 2023-12-31
 ```
 
-### 3. Test on Different Assets
+### Asset-type rotation
 
 ```bash
-# Tech stocks (trending)
-python main.py run-recipe --name macd_ema --symbol NVDA
-python main.py run-recipe --name multi_timeframe --symbol MSFT
+# Trending tech
+python main.py run-recipe --name macd_ema --symbol MSFT
 
-# Volatile stocks (mean reversion)
-python main.py run-recipe --name bollinger_rsi --symbol TSLA
+# Volatile meme stock
 python main.py run-recipe --name rsi --symbol GME
+
+# Crypto momentum
+python main.py run-recipe --name multi_timeframe --symbol BTCUSDT --start 2021-01-01 --end 2023-12-31
 ```
 
-## Available Recipes
+## 6. Streamlit Shortcut
 
-List all available recipes:
-```bash
-# These are the current recipes
-- sample           # Original SMA example
-- rsi              # NEW: Basic RSI strategy
-- macd_ema         # NEW: Intermediary MACD strategy
-- bollinger_rsi    # NEW: Advanced Bollinger strategy
-- multi_timeframe  # NEW: Maximum momentum strategy
-```
-
-## Next Steps
-
-1. **Start Simple**: Run the RSI recipe first
-   ```bash
-   python main.py run-recipe --name rsi --symbol AAPL
-   ```
-
-2. **Progress to Intermediary**: Test MACD + EMA
-   ```bash
-   python main.py run-recipe --name macd_ema --symbol AAPL
-   ```
-
-3. **Try Advanced**: Bollinger Bands + RSI
-   ```bash
-   python main.py run-recipe --name bollinger_rsi --symbol AAPL
-   ```
-
-4. **Master Maximum**: Multi-timeframe momentum
-   ```bash
-   python main.py run-recipe --name multi_timeframe --symbol AAPL
-   ```
-
-## Detailed Documentation
-
-For complete strategy details, parameters, and optimization tips, see:
-- **STRATEGIES.md** - Comprehensive strategy documentation
-- **README.md** - General framework documentation
-
-## Tips
-
-- Always activate the virtual environment: `source venv/bin/activate`
-- Start with AAPL as it has good data in most cases
-- Compare strategies on the same symbol and period
-- Each strategy level builds on concepts from the previous one
-- The multi_timeframe strategy is production-ready for professional use
-
-## Getting Help
+Prefer point-and-click? Launch Streamlit and use the Backtest Runner page:
 
 ```bash
-# General help
-python main.py --help
-
-# Recipe help
-python main.py run-recipe --help
-
-# Strategy help
-python main.py run-strategy --help
+./start.sh     # Opens http://localhost:8502 with prebuilt forms, metrics, and charts
 ```
 
-Enjoy backtesting! 🚀
+Each Streamlit run internally calls the same engines through `run_recipe_programmatic`, so results match the CLI.
+
+## 7. Helpful Commands & Tips
+
+- `python main.py list-recipes` *(if you add a helper command)* or inspect `main.py` → `RECIPE_REGISTRY` for names.
+- `python main.py fetch-data --help` to view all data-source flags.
+- Close Streamlit before running long CLI jobs to avoid DuckDB locks.
+- Use processed symbols like `AAPL`, `MSFT`, or `BTCUSDT` first; they have complete sample data.
+- Logs live at `logs/wawastock.log`; tail them when iterating on strategy code.
+
+## 8. Where to Go Next
+
+- Dive into `docs/STRATEGIES.md` for equations, indicator combos, and tuning heuristics.
+- Skim `docs/LOGGING.md` to extend ReportEngine/Loguru output.
+- Use `scripts/show_data_summary.py` to inspect processed data before testing.
+
+Happy backtesting! 🚀

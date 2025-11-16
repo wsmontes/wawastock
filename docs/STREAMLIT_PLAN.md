@@ -1,404 +1,114 @@
-# WawaStock Streamlit Interface - Plano Completo
-
-## Objetivo
-Criar uma interface web moderna e interativa usando Streamlit para o WawaStock, mantendo **100% das funcionalidades CLI** intactas e funcionais.
-
----
-
-## Arquitetura da Solução
-
-### Estrutura de Arquivos
-```
 wawastock/
-├── streamlit_app.py          # Aplicação principal Streamlit
-├── streamlit_pages/          # Páginas multi-page app
-│   ├── 1_📊_Backtest.py
-│   ├── 2_📈_Data_Explorer.py
-│   ├── 3_⚙️_Strategy_Builder.py
-│   ├── 4_📉_Performance_Analysis.py
-│   └── 5_💾_Data_Manager.py
-├── streamlit_components/     # Componentes reutilizáveis
-│   ├── __init__.py
-│   ├── charts.py            # Gráficos com Plotly/Altair
-│   ├── metrics.py           # Cards de métricas
-│   ├── tables.py            # Tabelas de dados
-│   └── forms.py             # Formulários de configuração
-└── main.py                   # CLI mantido intacto
+# WawaStock Streamlit Interface – Plan & Status
+
+This roadmap keeps the Streamlit experience aligned with the CLI engines. The UI reuses `DataEngine`, `BacktestEngine`, and `ReportEngine` through the same registries exposed in `main.py`, so every run—scripted or visual—produces identical results.
+
+## Current Status (Nov 2025)
+
+| Page / Feature | Purpose | Status | Shipped Highlights | Next Up |
+|----------------|---------|--------|--------------------|---------|
+| **📊 Backtest Runner** (`pages/1_📊_Backtest.py`) | Primary interface to launch recipes | ✅ Done | Recipe selector, parameter form, metrics cards, equity + price charts, trade table download | Add parameter presets per strategy + caching for repeated runs |
+| **📈 Data Explorer** (`pages/1_Analysis.py` placeholder) | Visualize OHLCV + indicators | 🚧 In progress | Basic dataframe preview + placeholder charts | Finish Plotly candlestick with indicator toggles, descriptive stats, multi-symbol compare |
+| **⚙️ Strategy Builder** | Build custom logic visually/code editor | 💤 Not started | – | Drag-and-drop condition builder, Monaco editor, quick-test harness |
+| **📉 Performance Analysis** | Compare strategies & risk metrics | 💤 Not started | – | Equity curve overlay, Monte Carlo sim, risk table |
+| **💾 Data Manager** | Manage downloads/cache/inventory | 💤 Not started | – | Symbol inventory, cache clear, bulk download UI |
+
+Legend: ✅ complete · 🚧 in progress · 💤 planned
+
+## File Layout
+
 ```
-
----
-
-## Páginas da Aplicação
-
-### 📊 Página 1: Backtest Runner (Principal)
-**Objetivo**: Interface principal para executar backtests de forma visual e interativa
-
-#### Layout
-```
-┌─────────────────────────────────────────────────────────┐
-│ 🎯 WawaStock - Backtesting Framework                   │
-├─────────────────────────────────────────────────────────┤
-│ SIDEBAR                  │ MAIN CONTENT                 │
-│                          │                              │
-│ [Recipe Selection]       │ ┌─ Configuration ─────────┐ │
-│ ○ Sample SMA             │ │ Symbol: [AAPL     ▼]    │ │
-│ ○ RSI                    │ │ Period: [2020-2023]     │ │
-│ ● MACD+EMA               │ │ Initial Cash: $100,000  │ │
-│ ○ Bollinger+RSI          │ └─────────────────────────┘ │
-│ ○ Multi-Timeframe        │                              │
-│                          │ ┌─ Strategy Parameters ───┐ │
-│ [Symbol Input]           │ │ MACD Fast: [12]         │ │
-│ [Date Range Picker]      │ │ MACD Slow: [26]         │ │
-│ [Advanced Options]       │ │ EMA Period: [200]       │ │
-│                          │ │ Position Size: [95%]    │ │
-│ [🚀 Run Backtest]        │ └─────────────────────────┘ │
-│                          │                              │
-│                          │ [Run Backtest Button]        │
-└──────────────────────────┴──────────────────────────────┘
-```
-
-#### Funcionalidades
-1. **Seleção de Strategy/Recipe**
-   - Radio buttons ou selectbox para escolher recipe
-   - Descrição dinâmica de cada estratégia
-   - Preview dos parâmetros disponíveis
-
-2. **Configuração de Parâmetros**
-   - Símbolo: Autocomplete com sugestões (AAPL, MSFT, BTC-USD, ETH-USD)
-   - Date range picker para período
-   - Sliders para initial_cash, commission
-   - Parâmetros específicos da estratégia (dinâmicos)
-
-3. **Execução do Backtest**
-   - Progress bar durante execução
-   - Spinner com status (Loading data → Calculating indicators → Running backtest)
-   - Integração direta com BacktestEngine
-
-4. **Visualização de Resultados**
-   - **Métricas principais** (cards grandes):
-     - Initial Value vs Final Value
-     - Total Return (%)
-     - Profit/Loss ($)
-   - **Métricas secundárias** (cards menores):
-     - Sharpe Ratio
-     - Max Drawdown
-     - Total Trades
-     - Win Rate
-   
-5. **Gráficos Interativos**
-   - **Equity Curve**: Evolução do portfólio ao longo do tempo
-   - **Price Chart**: Preço + Indicadores + Pontos de entrada/saída
-   - **Drawdown Chart**: Visualização de drawdowns
-   - **Returns Distribution**: Histograma de retornos
-
-6. **Tabela de Trades**
-   - Lista de todas as operações
-   - Colunas: Date, Type (Buy/Sell), Price, Size, PnL, %
-   - Filtros e ordenação
-   - Export para CSV
-
----
-
-### 📈 Página 2: Data Explorer
-**Objetivo**: Explorar e visualizar dados OHLCV com indicadores
-
-#### Funcionalidades
-1. **Seleção de Dados**
-   - Dropdown com símbolos disponíveis no banco
-   - Upload de novos dados
-   - Date range selection
-
-2. **Visualização**
-   - Candlestick chart interativo (Plotly)
-   - Sobreposição de indicadores (toggle on/off):
-     - Moving Averages (SMA, EMA)
-     - Bollinger Bands
-     - Volume bars
-   - Subgráficos:
-     - RSI
-     - MACD
-     - Stochastic
-     - OBV
-
-3. **Estatísticas Descritivas**
-   - Summary statistics (mean, std, min, max)
-   - Correlation matrix dos indicadores
-   - Missing data analysis
-
-4. **Comparação Multi-Symbol**
-   - Selecionar múltiplos símbolos
-   - Normalized price comparison
-   - Correlation heatmap
-
----
-
-### ⚙️ Página 3: Strategy Builder
-**Objetivo**: Criar e testar estratégias customizadas (futuro)
-
-#### Funcionalidades (Roadmap)
-1. **Visual Strategy Builder**
-   - Drag-and-drop conditions
-   - Logic builder (IF/AND/OR)
-   - Indicator selector
-
-2. **Code Editor**
-   - Monaco editor para editar código Python
-   - Syntax highlighting
-   - Auto-completion
-
-3. **Quick Test**
-   - Fast backtest com período curto
-   - Validation de estratégia
-
----
-
-### 📉 Página 4: Performance Analysis
-**Objetivo**: Análise detalhada de performance e comparação
-
-#### Funcionalidades
-1. **Compare Strategies**
-   - Selecionar múltiplas estratégias
-   - Comparar side-by-side:
-     - Returns
-     - Sharpe Ratio
-     - Max Drawdown
-     - Win Rate
-   - Gráfico comparativo de equity curves
-
-2. **Monte Carlo Simulation**
-   - Simular múltiplos cenários
-   - Distribution of outcomes
-   - Confidence intervals
-
-3. **Risk Analysis**
-   - Value at Risk (VaR)
-   - Conditional VaR
-   - Beta vs market
-   - Volatility analysis
-
-4. **Trade Analysis**
-   - Average win/loss
-   - Profit factor
-   - Expectancy
-   - Best/worst trades
-
----
-
-### 💾 Página 5: Data Manager
-**Objetivo**: Gerenciar dados, cache e downloads
-
-#### Funcionalidades
-1. **Data Inventory**
-   - Tabela com todos os símbolos no banco
-   - Info: Symbol, Rows, Date Range, Size, Indicators
-   - Actions: View, Download, Delete
-
-2. **Bulk Download**
-   - Upload CSV com lista de símbolos
-   - Download de múltiplos símbolos
-   - Progress tracking
-
-3. **Cache Management**
-   - View cache info
-   - Clear cache by symbol/date
-   - Cache statistics
-
-4. **Data Quality**
-   - Check missing data
-   - Validate indicator calculations
-   - Re-calculate indicators button
-
----
-
-## Componentes Técnicos
-
-### 1. `streamlit_app.py` - Aplicação Principal
-```python
-import streamlit as st
-from streamlit_pages import backtest, data_explorer, strategy_builder
-
-st.set_page_config(
-    page_title="WawaStock",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Session state initialization
-if 'backtest_results' not in st.session_state:
-    st.session_state.backtest_results = None
-
-# Main page
-st.title("🎯 WawaStock Backtesting Framework")
-st.markdown("Professional-grade backtesting for trading strategies")
-
-# Navigation handled by streamlit multi-page
-```
-
-### 2. `streamlit_components/charts.py`
-```python
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import pandas as pd
-
-def plot_equity_curve(results: dict) -> go.Figure:
-    """Plot portfolio equity curve"""
-    
-def plot_candlestick_with_indicators(df: pd.DataFrame, indicators: list) -> go.Figure:
-    """Interactive candlestick chart with indicators"""
-    
-def plot_drawdown(equity_curve: pd.Series) -> go.Figure:
-    """Drawdown chart"""
-    
-def plot_returns_distribution(returns: pd.Series) -> go.Figure:
-    """Histogram of returns"""
-```
-
-### 3. `streamlit_components/metrics.py`
-```python
-def display_performance_metrics(results: dict):
-    """Display key performance metrics in cards"""
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            "Total Return",
-            f"{results['total_return']:.2f}%",
-            delta=f"${results['profit_loss']:,.2f}"
-        )
-```
-
-### 4. Bridge entre Streamlit e WawaStock
-```python
-# streamlit_components/bridge.py
-from engines.data_engine import DataEngine
-from engines.backtest_engine import BacktestEngine
-from recipes import RECIPE_REGISTRY
-
-class StreamlitBridge:
-    """Bridge between Streamlit UI and WawaStock engines"""
-    
-    def __init__(self):
-        self.data_engine = DataEngine()
-        self.backtest_engine = BacktestEngine()
-    
-    def run_recipe(self, recipe_name: str, **kwargs) -> dict:
-        """Run a recipe and return results in Streamlit-friendly format"""
-        recipe_cls = RECIPE_REGISTRY[recipe_name]
-        recipe = recipe_cls(self.data_engine, self.backtest_engine)
-        results = recipe.run(**kwargs)
-        return self._format_results(results)
-    
-    def _format_results(self, results: dict) -> dict:
-        """Format results for Streamlit display"""
-        # Convert to JSON-serializable format
-        # Extract equity curve, trades list, metrics
-        return formatted_results
-```
-
----
-
-## Tecnologias e Bibliotecas
-
-### Core
-- **streamlit**: ^1.30.0 - Framework principal
-- **plotly**: ^5.18.0 - Gráficos interativos
-- **altair**: ^5.2.0 - Gráficos declarativos (alternativa)
-
-### Data Viz
-- **pandas**: Already installed
-- **numpy**: Already installed
-- **matplotlib**: Backup para gráficos estáticos
-
-### UI Components
-- **streamlit-aggrid**: Tabelas avançadas com filtros
-- **streamlit-option-menu**: Menu lateral customizado
-- **streamlit-card**: Cards de métricas
-- **streamlit-extras**: Componentes adicionais
-
-### Optional Enhancements
-- **streamlit-authenticator**: Login/autenticação (futuro)
-- **streamlit-autorefresh**: Auto-refresh de dados
-- **streamlit-pdf-viewer**: Export de relatórios
-
----
-
-## Fluxo de Desenvolvimento
-
-### Fase 1: Setup e Estrutura Básica (Prioridade 1)
-1. ✅ Instalar Streamlit e dependências
-2. ✅ Criar `streamlit_app.py` com página principal
-3. ✅ Criar estrutura de pastas (`streamlit_pages/`, `streamlit_components/`)
-4. ✅ Implementar `StreamlitBridge` para integração com engines
-5. ✅ Criar página de Backtest básica
-
-### Fase 2: Página Principal de Backtest (Prioridade 1)
-1. ✅ Sidebar com seleção de recipe
-2. ✅ Formulário de parâmetros dinâmico
-3. ✅ Botão de execução com progress
-4. ✅ Display de métricas principais
-5. ✅ Gráfico de equity curve básico
-6. ✅ Tabela de trades
-
-### Fase 3: Visualizações Avançadas (Prioridade 2)
-1. 📊 Candlestick chart com indicadores
-2. 📊 Drawdown chart
-3. 📊 Returns distribution
-4. 📊 Trade markers no gráfico de preço
-
-### Fase 4: Data Explorer (Prioridade 2)
-1. 📈 Página de exploração de dados
-2. 📈 Candlestick interativo
-3. 📈 Toggles de indicadores
-4. 📈 Multi-symbol comparison
-
-### Fase 5: Performance Analysis (Prioridade 3)
-1. 📉 Página de análise comparativa
-2. 📉 Compare strategies
-3. 📉 Risk metrics
-4. 📉 Trade analysis
-
-### Fase 6: Data Manager (Prioridade 3)
-1. 💾 Página de gerenciamento
-2. 💾 Data inventory
-3. 💾 Bulk download
-4. 💾 Cache management
-
-### Fase 7: Polish e Otimizações (Prioridade 4)
-1. 🎨 Tema customizado
-2. 🎨 Responsividade mobile
-3. 🎨 Dark mode
-4. ⚡ Performance optimization (caching)
-5. ⚡ Error handling
-6. 📝 Help tooltips e documentação inline
-
----
-
-## Design System
-
-### Paleta de Cores
-```python
-COLORS = {
-    'primary': '#1f77b4',      # Blue
-    'success': '#2ca02c',      # Green (profit)
-    'danger': '#d62728',       # Red (loss)
-    'warning': '#ff7f0e',      # Orange
-    'info': '#17becf',         # Cyan
-    'neutral': '#7f7f7f',      # Gray
-}
-```
-
-### Typography
-- Headers: Bold, size hierarchy (H1, H2, H3)
-- Metrics: Large, bold numbers
-- Body text: Regular, readable size
-- Code: Monospace for símbolos e valores técnicos
-
-### Layout Principles
-1. **Wide layout**: Aproveitar espaço horizontal
-2. **Card-based**: Agrupar informações relacionadas em containers
-3. **Progressive disclosure**: Detalhes em expanders/tabs
 4. **Responsive grids**: Adaptar colunas ao espaço disponível
+├── streamlit_app.py        # Entry point (multipage redirect)
+├── pages/                  # Native Streamlit pages (per filename prefix)
+│   ├── 1_📊_Backtest.py    # Shipped page
+│   └── 1_Analysis.py       # Placeholder for Data Explorer
+├── streamlit_components/   # Shared widgets/helpers
+│   ├── charts.py           # Plotly charts (equity, candlestick, drawdown)
+│   ├── metrics.py          # KPI cards + delta logic
+│   ├── tables.py           # Trade/position tables
+│   └── bridge.py           # StreamlitBridge (DataEngine + BacktestEngine)
+└── main.py                 # CLI/recipe definitions reused by the bridge
+```
+
+## Data Flow
+
+1. User selects a recipe/strategy and parameters in Streamlit.
+2. `StreamlitBridge` calls `run_recipe_programmatic()` from `main.py`, ensuring the same engines as the CLI.
+3. `BacktestEngine` returns a results dict containing analyzers, equity curve, and trades.
+4. Streamlit components render metrics, charts, and tables; optional exports stream from the same data.
+
+No direct database writes occur from Streamlit—`DataEngine` handles caching/Parquet persistence, so CLI and UI remain in sync.
+
+## Page Breakdown
+
+### 📊 Backtest Runner (Shipped)
+
+- **Controls**: recipe selector, symbol input, date pickers, advanced expanders for cash/commission/strategy params.
+- **Status messaging**: spinners for “Loading data” → “Running backtest”, plus Rich/ReportEngine logs in the terminal.
+- **Visuals**: KPI cards (`metrics.py`), Plotly equity and price+indicator charts (`charts.py`), drawdown tab, trade table with CSV download.
+- **Next enhancements**: saved parameter presets per strategy, ability to pin multiple runs for side-by-side comparison, caching of last run per session.
+
+### 📈 Data Explorer (In Progress)
+
+- **Goal**: interactive OHLCV explorer with indicator toggles, descriptive stats, and multi-symbol correlation.
+- **Current**: placeholder page referencing `DataEngine` to load data.
+- **Planned**: Plotly candlestick with overlays (SMA, EMA, Bollinger, VWAP), RSI/MACD subplots, stats cards (min/max/avg), correlation heatmap, export controls.
+
+### ⚙️ Strategy Builder (Planned)
+
+- **Phase 1**: Form-based condition builder (IF/AND/OR), indicator selector pulled from `IndicatorsEngine` presets.
+- **Phase 2**: Monaco editor to tweak Python strategy templates inline.
+- **Phase 3**: Quick-test harness for short backtests with immediate results.
+
+### 📉 Performance Analysis (Planned)
+
+- Compare multiple strategies/runs via uploaded CSVs or session cache.
+- Monte Carlo simulator (bootstrap trade returns) with confidence intervals.
+- Advanced risk metrics (VaR/CVaR/Beta) and trade distribution visuals.
+
+### 💾 Data Manager (Planned)
+
+- Symbol inventory table (rows, date range, indicator columns, file size).
+- Cache management (clear symbol, refresh indicators, rebuild DuckDB indexes).
+- Bulk downloader leveraging existing `scripts/download_*` utilities.
+
+## Shared Components
+
+- **`streamlit_components/bridge.py`** – wraps `DataEngine` + `BacktestEngine`; ensures the UI never directly instantiates recipes.
+- **`charts.py`** – Plotly builders (`plot_equity_curve`, `plot_candlestick_with_indicators`, `plot_drawdown`, `plot_returns_distribution`).
+- **`metrics.py`** – Reusable `st.metric` layouts, with helper functions for formatting currency/percent deltas.
+- **`tables.py`** – DataFrame -> AgGrid/native tables + CSV download utilities.
+
+## Tech Stack
+
+- `streamlit` ≥ 1.30 (multipage support, native themes)
+- `plotly` ≥ 5.18 for interactive charts
+- `pandas`, `numpy` (already core dependencies)
+- Optional: `streamlit-aggrid`, `streamlit-extras`, `altair` for advanced tables/visuals (install as needed)
+
+## Delivery Phases
+
+1. **Foundation (complete)** – Setup scripts (`start.sh`), base Backtest Runner, bridge module, metrics & charts components.
+2. **Visual Enhancements (in progress)** – Enrich Backtest Runner visuals, finalize Data Explorer candlestick/drawdown charts.
+3. **Analysis Suite (planned)** – Performance comparison, Monte Carlo, strategy builder MVP.
+4. **Data Management (planned)** – Inventory, cache control, bulk download UI.
+5. **Polish** – Theme toggles, responsive tweaks, tooltip docs, error boundary improvements.
+
+## Design Notes
+
+- **Layout**: Use `st.set_page_config(layout="wide")`, with sidebar for navigation and top-level controls.
+- **Color palette**: reuse the Rich/CLI palette (`primary` blue `#1f77b4`, `success` green `#2ca02c`, `danger` red `#d62728`, `warning` orange `#ff7f0e`, `info` cyan `#17becf`).
+- **Consistency**: Metric labels, icons, and table headers should match ReportEngine wording (Initial Value, Final Value, Profit/Loss, etc.).
+
+## Next Steps Checklist
+
+- [ ] Finish Data Explorer visuals + stats block.
+- [ ] Add caching/preset support to Backtest Runner forms.
+- [ ] Scaffold Strategy Builder page with placeholder controls.
+- [ ] Define shared theme constants for colors/spacing across charts and cards.
+
+This document will continue to track the Streamlit roadmap so contributors can see exactly what’s done versus what’s in flight.
 
 ---
 

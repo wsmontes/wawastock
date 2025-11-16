@@ -1,21 +1,18 @@
-# ReportEngine Migration - Complete
+# ReportEngine Migration & Usage Guide
 
-## Overview
-Successfully migrated all recipe output to use centralized `ReportEngine` for standardized terminal output with Rich formatting and Loguru logging integration.
+The `ReportEngine` now owns every piece of CLI output inside WawaStock. This document explains what changed, how to adopt the new pattern in future recipes, and how to customize the presentation.
 
 ## What Changed
 
 ### New Component
-**`engines/report_engine.py`** - Centralized reporting engine that handles ALL terminal output standardization
-
-Key features:
+**`engines/report_engine.py`** centralizes:
 - Rich-formatted tables, panels, and progress indicators
-- Automatic logging via Loguru for all output
-- Consistent color-coded status messages
-- Professional results presentation
+- Automatic Loguru logging (console + rotating file)
+- Consistent status badges (info/success/warning/error)
+- Analyzer rendering (Sharpe, drawdown, trade stats)
 
 ### Migrated Recipes
-All 5 recipes now use `ReportEngine`:
+All shipping recipes call `ReportEngine`:
 
 1. ✅ **rsi_recipe.py** - RSI Mean Reversion
 2. ✅ **macd_ema_recipe.py** - MACD + EMA Trend Following  
@@ -68,40 +65,24 @@ class MyRecipe(BaseRecipe):
         self.report.print_backtest_results(results)
 ```
 
-## ReportEngine Methods
+## ReportEngine API
 
-### `print_strategy_header(strategy_name, symbol, start, end, params)`
-Displays strategy configuration in a formatted panel with parameters table.
-
-### `print_step(message, status="info")`
-Shows progress updates with colored icons:
-- ℹ️ info (cyan)
-- ✓ success (green)
-- ⚠️ warning (yellow)
-- ✗ error (red)
-
-### `print_data_summary(rows, start_date, end_date)`
-Shows data loading summary with success icon.
-
-### `print_backtest_results(results)`
-Displays comprehensive backtest results with:
-- Core metrics table (Initial/Final Value, P&L, Return)
-- Analyzer metrics table (Sharpe Ratio, Max Drawdown, Total Return)
-- Color-coded values (green for positive, red for negative)
-
-### `print_error(title, message)`
-Shows error messages in a red-bordered panel.
-
-### `create_progress_context(description)`
-Returns Rich Progress context manager for long-running operations.
+| Method | What it does |
+|--------|---------------|
+| `print_strategy_header(strategy_name, symbol, start, end, params)` | Panel with metadata + params table |
+| `print_step(message, status="info")` | Status badge (`info`, `success`, `warning`, `error`) |
+| `print_data_summary(rows, start_date, end_date)` | Summarizes candles loaded |
+| `print_backtest_results(results)` | Two tables: portfolio metrics + analyzer metrics |
+| `print_error(title, message)` | Red bordered panel for fatal errors |
+| `create_progress_context(description)` | Rich Progress context manager |
 
 ## Benefits
 
-1. **Consistency**: All recipes now have identical, professional-looking output
-2. **Maintainability**: Changes to output format happen in ONE place (ReportEngine)
-3. **Logging**: All terminal output is automatically logged to files via Loguru
-4. **Visibility**: Rich formatting makes output easier to read and understand
-5. **Standards**: Enforces professional output patterns across the framework
+1. **Consistency** – One style across CLI, CI logs, and demos.
+2. **Maintainability** – Update `ReportEngine` once to change styling globally.
+3. **Logging** – Every panel/table mirrors into `logs/wawastock.log` via Loguru.
+4. **Streamlit parity** – `run_recipe_programmatic()` consumes the same results dict produced right after `print_backtest_results`.
+5. **Extensibility** – Add new helper methods (e.g., trade breakdown tables) and adopt them across recipes without touching each file.
 
 ## Example Output
 
@@ -139,19 +120,33 @@ Returns Rich Progress context manager for long-running operations.
 ╰───────────────────────┴────────────────╯
 ```
 
+## Adoption Checklist
+
+1. **Import & initialize**: `from engines.report_engine import ReportEngine` and set `self.report = ReportEngine()` inside the recipe’s `__init__`.
+2. **Replace prints**: Swap `print()` calls for the appropriate helper (header, step updates, summaries, results, errors).
+3. **Wrap long tasks**: Use `create_progress_context` for loops (e.g., optimization runs).
+4. **Bubble errors**: Instead of `print("error")`, raise exceptions or call `print_error` then `raise`—both the console and log file capture the details.
+5. **Return results**: Recipes should still return/propagate the `BacktestEngine` results dict so Streamlit and scripts can consume it.
+
+## Customization Tips
+
+- Need new analyzer fields? Extend `ReportEngine._format_results_table()` (or similar) with additional rows (e.g., Sortino, exposure time).
+- Localization or theming can be centralized by editing the palette/border styles in `ReportEngine`.
+- Want CSV/HTML export? Add methods that accept the same results dict and write to disk; call them from recipes after printing tables.
+
 ## Testing
 
-Verified with:
 ```bash
 python main.py run-recipe --name rsi --symbol AAPL
+python main.py run-recipe --name multi_timeframe --symbol NVDA --start 2021-01-01 --end 2023-12-31
 ```
 
-All recipes produce clean, formatted output with proper logging.
+Confirm that headers, steps, and analyzer tables appear, and that `logs/wawastock.log` mirrors the output.
 
-## Next Steps
+## Future Enhancements
 
-Future recipes should:
-1. Import `ReportEngine` from `engines.report_engine`
-2. Initialize `self.report = ReportEngine()` in `__init__`
-3. Use ReportEngine methods instead of `print()` statements
-4. Follow the pattern established in existing recipes
+- Export Rich tables to Markdown/HTML for reports.
+- Add a `print_trades_table` helper fed by the trade analyzer.
+- Surface warnings (e.g., missing indicators, short datasets) consistently via `print_step(..., status="warning")`.
+
+Following this guide keeps every new recipe aligned with the rest of the platform and minimizes copy/paste formatting code.

@@ -36,6 +36,7 @@ class MACDEMARecipe(BaseRecipe):
         macd_signal: int = 9,
         trend_ema: int = 200,
         position_size_pct: float = 0.95,
+        stop_loss_pct: float = 0.03,
         trail_pct: float = 0.02
     ):
         """
@@ -50,6 +51,7 @@ class MACDEMARecipe(BaseRecipe):
             macd_signal: MACD signal period (default: 9)
             trend_ema: Trend filter EMA (default: 200)
             position_size_pct: Position size as % of equity (default: 0.95 = 95%)
+            stop_loss_pct: Initial stop loss % (default: 0.03 = 3%)
             trail_pct: Trailing stop % (default: 0.02 = 2%)
         """
         # Load data first
@@ -77,6 +79,7 @@ class MACDEMARecipe(BaseRecipe):
             macd_signal=macd_signal,
             trend_ema=trend_ema,
             position_size_pct=position_size_pct,
+            stop_loss_pct=stop_loss_pct,
             trail_pct=trail_pct
         )
         
@@ -91,6 +94,7 @@ class MACDEMARecipe(BaseRecipe):
                 'macd': f"{macd_fast}/{macd_slow}/{macd_signal}",
                 'trend_filter': f"{trend_ema} EMA",
                 'position_size': f"{position_size_pct*100:.0f}%",
+                'stop_loss': f"{stop_loss_pct*100:.1f}%",
                 'trailing_stop': f"{trail_pct*100:.1f}%"
             }
         )

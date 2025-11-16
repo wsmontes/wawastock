@@ -1,324 +1,145 @@
-# Backtesting Framework
+# WawaStock Backtesting Framework
 
-Mini framework de backtesting em Python usando `backtrader`, `duckdb` e Parquet para análise de estratégias de trading.
+Professional-grade Python backtesting toolkit powered by `backtrader`, `duckdb`, `pandas`, and Streamlit. WawaStock bundles data ingestion, indicator enrichment, rich CLI reporting, and a multi-page UI so you can go from raw candles to strategy insights in minutes.
 
-## 📁 Estrutura do Projeto
+## Why WawaStock?
 
-```
-wawastock/
-├── main.py                           # CLI principal
-├── engines/                          # Motores do framework
-│   ├── __init__.py
-│   ├── base_engine.py               # Classe base para engines
-│   ├── data_engine.py               # Carregamento de dados (Parquet + DuckDB)
-│   └── backtest_engine.py           # Execução de backtests (Backtrader)
-├── strategies/                       # Estratégias de trading
-│   ├── __init__.py
-│   ├── base_strategy.py             # Classe base para strategies
-│   └── sample_sma_strategy.py       # Exemplo: SMA Crossover
-├── recipes/                          # Workflows de backtesting
-│   ├── __init__.py
-│   ├── base_recipe.py               # Classe base para recipes
-│   └── sample_recipe.py             # Exemplo de recipe
-└── data/                             # Dados de mercado
-    ├── raw/                          # Dados brutos
-    └── processed/                    # Dados processados (Parquet)
-```
+- **Composable engines** – `DataEngine`, `BacktestEngine`, `IndicatorsEngine`, and `ReportEngine` keep responsibilities separated and easy to extend.
+- **Strategy library** – Five tiered strategies (RSI → Multi-Timeframe momentum) with ready-made recipes and parameter presets.
+- **Local-first storage** – Parquet + DuckDB cache, optional DuckDB-backed indicators, and scripts to download equities or crypto from Yahoo, Binance, CCXT, and Alpaca.
+- **Rich DX** – Loguru + Rich for structured logs, colorized CLI panels, and progress bars.
+- **Modern UI** – Streamlit dashboards (`start.sh`) with metrics, charts, trade logs, and recipe controls.
 
-## 🚀 Instalação
+## Architecture at a Glance
 
-### 1. Ativar o ambiente virtual
+| Layer | Purpose | Key Files |
+|-------|---------|-----------|
+| Engines | Execution primitives | `engines/base_engine.py`, `data_engine.py`, `backtest_engine.py`, `indicators_engine.py`, `report_engine.py` |
+| Strategies | Trading logic (inherits `BaseStrategy`) | `strategies/*.py` |
+| Recipes | Orchestrated workflows combining engines + strategies | `recipes/*.py` |
+| CLI & Scripts | `main.py`, `scripts/*.py` for data download and summaries | |
+| UI | Streamlit app + components under `streamlit_pages/` and `streamlit_components/` | |
+
+## Installation & Environment
+
+### 1. Automated setup (recommended)
 
 ```bash
-source venv/bin/activate
+./setup.sh        # macOS / Linux
+setup.bat         # Windows
 ```
 
-### 2. Instalar dependências
+The script checks Python ≥3.8, creates `venv/`, installs `requirements.txt`, seeds data folders, and validates backtrader/DuckDB availability.
 
-**Dependências mínimas (backtest local):**
-```bash
-pip install backtrader pandas pyarrow duckdb
-```
+### 2. Manual steps (if you prefer)
 
-**Todas as dependências (incluindo fontes de dados):**
 ```bash
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+mkdir -p data/processed data/parquet logs
 ```
 
-**Ou instalar fontes de dados específicas:**
-```bash
-# Yahoo Finance (ações, ETFs, índices, forex, crypto)
-pip install yfinance
+> Need extra data sources? Install targeted packages (e.g., `pip install yfinance ccxt python-binance alpaca-py`).
 
-# Binance (cryptocurrency)
-pip install python-binance
+## Quickstart Workflow
 
-# Alpaca (ações US)
-pip install alpaca-py
+1. **Activate the virtual environment** (see above).
+2. **Run the sample recipe** to confirm everything works:
+   ```bash
+   python main.py run-recipe --name sample --symbol AAPL --start 2022-01-01 --end 2022-12-31
+   ```
+3. **Launch the Streamlit UI** for dashboards:
+   ```bash
+   ./start.sh      # or start.bat
+   ```
+4. **Download data** via CLI or scripts (see “Data ingestion”).
 
-# CCXT (100+ exchanges)
-pip install ccxt
-```
+Troubleshooting tip: DuckDB allows a single writer. Close the Streamlit app before launching long CLI jobs, or use the OS scripts to avoid overlapping processes.
 
-## 📡 Fontes de Dados
+## Running Recipes vs. Strategies
 
-O framework suporta múltiplas fontes de dados:
-
-### Yahoo Finance
-- **Tipos**: Ações, ETFs, Índices, Forex, Crypto
-- **Exemplos**: AAPL, SPY, ^GSPC, EURUSD=X, BTC-USD
-- **API Key**: Não requerida
-- **Intervalos**: 1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo
-
-### Binance
-- **Tipos**: Cryptocurrency (spot)
-- **Exemplos**: BTCUSDT, ETHUSDT, BNBUSDT
-- **API Key**: Opcional (pública para dados históricos)
-- **Intervalos**: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
-
-### Alpaca
-- **Tipos**: Ações US
-- **Exemplos**: AAPL, TSLA, SPY
-- **API Key**: Requerida (tier gratuito disponível)
-- **Intervalos**: 1m, 5m, 15m, 30m, 1h, 1d, 1w, 1M
-- **Registro**: https://alpaca.markets
-
-### CCXT
-- **Tipos**: 100+ exchanges de crypto
-- **Exchanges**: Binance, Coinbase, Kraken, Bybit, KuCoin, etc.
-- **Exemplos**: BTC/USDT, ETH/USD, BNB/BTC
-- **API Key**: Opcional (pública para dados históricos)
-- **Intervalos**: Variam por exchange
-
-## 📊 Formato dos Dados
-
-Os arquivos Parquet devem conter as seguintes colunas:
-
-- `datetime`: timestamp (índice)
-- `open`: preço de abertura (float)
-- `high`: preço máximo (float)
-- `low`: preço mínimo (float)
-- `close`: preço de fechamento (float)
-- `volume`: volume negociado (numeric)
-
-Exemplo de estrutura:
-```
-data/
-├── raw/
-│   └── binance/
-│       └── BTCUSDT/
-│           └── data.parquet
-└── processed/
-    ├── TEST.parquet
-    ├── AAPL.parquet
-    └── BTCUSDT.parquet
-```
-
-## 💻 Uso da CLI
-
-### Buscar dados de fontes externas
+Recipes wrap a full workflow (data load → indicators → backtest → report). Strategies give direct control over parameters. All commands share these global flags: `--symbol`, `--start`, `--end`, `--cash`, `--commission`.
 
 ```bash
-# Yahoo Finance - Ações
-python main.py fetch-data --source yahoo --symbol AAPL --start 2020-01-01 --end 2023-12-31
-
-# Yahoo Finance - Crypto
-python main.py fetch-data --source yahoo --symbol BTC-USD --start 2022-01-01 --interval 1d
-
-# Binance - Crypto
-python main.py fetch-data --source binance --symbol BTCUSDT --start 2023-01-01 --interval 1h
-
-# CCXT - Qualquer exchange
-python main.py fetch-data --source ccxt --exchange kraken --symbol BTC/USD --start 2023-01-01
-
-# CCXT - Binance via CCXT
-python main.py fetch-data --source ccxt --exchange binance --symbol ETH/USDT --interval 4h
-
-# Alpaca - Ações US (requer API key)
-python main.py fetch-data --source alpaca --symbol TSLA \
-  --api-key YOUR_API_KEY \
-  --api-secret YOUR_API_SECRET \
-  --start 2023-01-01 --end 2023-12-31
-```
-
-### Listar comandos disponíveis
-
-```bash
+# List help
 python main.py --help
+python main.py run-recipe --help
+python main.py run-strategy --help
+
+# Recipes
+python main.py run-recipe --name rsi --symbol AAPL
+python main.py run-recipe --name macd_ema --symbol MSFT --start 2020-01-01 --end 2023-12-31
+
+# Strategies directly
+python main.py run-strategy --strategy bollinger_rsi --symbol NVDA --rsi_period 10 --risk_per_trade 0.03
+python main.py run-strategy --strategy multi_timeframe --symbol TSLA --cash 250000 --commission 0.0005
 ```
 
-### Executar uma recipe
+Backtest output is standardized by `ReportEngine` using Rich panels, tables, and analyzers (Sharpe, Drawdown, Total Return, trade stats). Logs are written to `logs/wawastock.log` via Loguru with rotation and compression.
+
+## Streamlit Interface
+
+- **Start**: `./start.sh` (macOS/Linux) or `start.bat` (Windows).
+- **Pages**: Backtest runner, Data Explorer, Strategy Builder roadmap, Performance Analysis, Data Manager (see `docs/STREAMLIT_PLAN.md`).
+- **Bridge**: Streamlit calls `run_recipe_programmatic()` in `main.py`, ensuring the same engines run behind the scenes.
+- **Features**: parameter forms, live metrics cards, Plotly charts (equity, price + indicators, drawdown), trade tables, CSV export.
+
+## Data Ingestion & Indicators
 
 ```bash
-# Recipe padrão
-python main.py run-recipe --name sample
+# Yahoo Finance
+python main.py fetch-data --source yahoo --symbol AAPL --start 2020-01-01 --end 2024-01-01 --interval 1d
 
-# Recipe com parâmetros customizados
-python main.py run-recipe --name sample --symbol AAPL --start 2020-01-01 --end 2020-12-31
+# Binance spot
+python main.py fetch-data --source binance --symbol BTCUSDT --interval 1h --start 2023-01-01
 
-# Recipe com capital e comissão customizados
-python main.py run-recipe --name sample --symbol TEST --cash 50000 --commission 0.002
+# CCXT (any exchange)
+python main.py fetch-data --source ccxt --exchange kraken --symbol ETH/USD --interval 4h
+
+# Alpaca (US equities, requires keys)
+python main.py fetch-data --source alpaca --symbol TSLA --api-key $ALPACA_KEY --api-secret $ALPACA_SECRET
 ```
 
-### Executar uma estratégia diretamente
+`DataEngine` stores candles as Parquet and exposes them via DuckDB. Enable automatic indicator enrichment when instantiating the engine (`auto_indicators=True`, `indicator_set='minimal|standard|full'`) to persist SMA/EMA/RSI/MACD/Bollinger/ATR/VWAP/etc. See `docs/INDICATORS.md` for the full catalog.
 
-```bash
-# Estratégia básica
-python main.py run-strategy --strategy sample_sma --symbol TEST --start 2020-01-01 --end 2020-12-31
+## Strategy Library Snapshot
 
-# Estratégia com parâmetros customizados
-python main.py run-strategy --strategy sample_sma --symbol AAPL --fast 5 --slow 15
+| Strategy | Recipe | Level | Ideal Market | Highlights |
+|----------|--------|-------|--------------|------------|
+| `rsi_strategy.py` | `recipes/rsi_recipe.py` | ⭐ Basic | Range-bound equities | RSI 14 mean reversion, fixed stop loss |
+| `macd_ema_strategy.py` | `recipes/macd_ema_recipe.py` | ⭐⭐ Intermediate | Trending stocks | MACD crossover + 200 EMA filter, trailing stop |
+| `bollinger_rsi_strategy.py` | `recipes/bollinger_rsi_recipe.py` | ⭐⭐⭐ Advanced | Volatile names | ATR position sizing, partial exits, BB + RSI filter |
+| `multi_timeframe_strategy.py` | `recipes/multi_timeframe_recipe.py` | ⭐⭐⭐⭐ Maximum | Pro momentum | Multi-timeframe EMA alignment, ADX/RSI/volume filters, pyramiding |
+| `sample_sma_strategy.py` | `recipes/sample_recipe.py` | Tutorial | Learning | Simple SMA crossover baseline |
 
-# Estratégia com capital e comissão customizados
-python main.py run-strategy --strategy sample_sma --symbol TEST --cash 200000 --commission 0.0005
-```
+Detailed playbooks live in `docs/STRATEGIES.md` (parameters, analyzer metrics, tuning tips).
 
-## 🔧 Componentes
+## Logging & Reporting
 
-### Engines
+- `utils/logger.py` centralizes Loguru configuration (rotation every 10 MB, 7-day retention, Rich colorization).
+- `ReportEngine` handles CLI UX: headers, status badges, data summaries, analyzer tables, and error panels. All recipes are migrated—any new workflow should instantiate `ReportEngine` for consistent output (see `docs/REPORT_ENGINE_MIGRATION.md`).
 
-**DataEngine**: Carrega e consulta dados de arquivos Parquet usando DuckDB
-- `load_prices(symbol, start, end)`: Carrega dados OHLCV para um símbolo
-- `load_parquet_table(path)`: Carrega arquivo Parquet como relação DuckDB
+## Documentation Map
 
-**BacktestEngine**: Executa backtests usando Backtrader
-- `run_backtest(strategy_cls, data_df, **params)`: Executa backtest de uma estratégia
-- Inclui analyzers: Sharpe Ratio, Drawdown, Returns
+| Guide | Purpose |
+|-------|---------|
+| `QUICKSTART_SETUP.md` | First-time setup scripts, environment troubleshooting |
+| `QUICKSTART.md` | How to run and compare the five bundled strategies |
+| `docs/STRATEGIES.md` | Deep dive into logic, parameters, performance tips |
+| `docs/INDICATORS.md` | Using `IndicatorsEngine` + pandas-ta integration |
+| `docs/LOGGING.md` | Loguru/Rich integration details |
+| `docs/IMPLEMENTATION_SUMMARY.md` | Platform internals & recent upgrades |
+| `docs/STREAMLIT_PLAN.md` | Streamlit roadmap and page breakdown |
+| `docs/REPORT_ENGINE_MIGRATION.md` | How CLI output became standardized |
 
-### Strategies
+## Next Steps & Ideas
 
-**BaseStrategy**: Classe base com funcionalidades comuns
-- Logging de eventos
-- Notificações de ordens e trades
+- Add walk-forward analysis recipes and optimization loops.
+- Expand Streamlit “Strategy Builder” with drag-and-drop and embedded code editor.
+- Support multi-symbol portfolios and blended recipes.
+- Ship report exports (PDF/HTML) via `ReportEngine` and Streamlit download buttons.
 
-**SampleSMAStrategy**: Estratégia de crossover de médias móveis
-- Parâmetros: `fast_period` (padrão: 10), `slow_period` (padrão: 20)
-- Compra: quando SMA rápida cruza acima da lenta
-- Vende: quando SMA rápida cruza abaixo da lenta
+## License
 
-### Recipes
-
-**BaseRecipe**: Classe base para coordenar workflows
-- Recebe DataEngine e BacktestEngine
-- Define método abstrato `run()`
-
-**SampleRecipe**: Exemplo de workflow completo
-- Carrega dados para um símbolo
-- Executa SampleSMAStrategy
-- Exibe resultados formatados
-
-## 🎯 Criando Novas Estratégias
-
-```python
-from strategies.base_strategy import BaseStrategy
-import backtrader as bt
-
-class MinhaEstrategia(BaseStrategy):
-    params = (
-        ('periodo', 14),
-    )
-    
-    def __init__(self):
-        self.indicador = bt.indicators.RSI(period=self.params.periodo)
-    
-    def next(self):
-        if not self.position:
-            if self.indicador < 30:  # Sobrevenda
-                self.buy()
-        else:
-            if self.indicador > 70:  # Sobrecompra
-                self.sell()
-```
-
-Depois, registre em `main.py`:
-
-```python
-STRATEGY_REGISTRY = {
-    'sample_sma': SampleSMAStrategy,
-    'minha_estrategia': MinhaEstrategia,  # Adicionar aqui
-}
-```
-
-## 🎯 Criando Novas Recipes
-
-```python
-from recipes.base_recipe import BaseRecipe
-from strategies.minha_estrategia import MinhaEstrategia
-
-class MinhaRecipe(BaseRecipe):
-    def run(self, symbol='TEST', start='2020-01-01', end='2020-12-31'):
-        print(f"Executando backtest para {symbol}...")
-        
-        # Carregar dados
-        data = self.data_engine.load_prices(symbol, start, end)
-        
-        # Executar backtest
-        results = self.backtest_engine.run_backtest(
-            MinhaEstrategia,
-            data,
-            periodo=14
-        )
-        
-        # Exibir resultados
-        print(f"Retorno: {results['return_pct']:.2f}%")
-```
-
-Registre em `main.py`:
-
-```python
-RECIPE_REGISTRY = {
-    'sample': SampleRecipe,
-    'minha_recipe': MinhaRecipe,  # Adicionar aqui
-}
-```
-
-## 📈 Exemplo de Saída
-
-```
-================================================================================
-SAMPLE RECIPE: SMA Crossover Strategy
-================================================================================
-Symbol: TEST
-Period: 2020-01-01 to 2020-12-31
-Strategy: SMA Crossover (Fast: 10, Slow: 20)
-================================================================================
-
-Loading data for TEST...
-Loaded 252 bars of data
-
-Running backtest...
-
-Starting Portfolio Value: $100,000.00
-2020-03-15 BUY SIGNAL, Fast SMA: 245.32, Slow SMA: 243.10
-2020-03-15 BUY EXECUTED, Price: 246.50, Cost: 24650.00, Comm: 24.65
-...
-Final Portfolio Value: $112,450.00
-PnL: $12,450.00 (12.45%)
-
-================================================================================
-BACKTEST RESULTS
-================================================================================
-Initial Portfolio Value: $100,000.00
-Final Portfolio Value:   $112,450.00
-Profit/Loss:             $12,450.00
-Return:                  12.45%
-
-Performance Metrics:
---------------------------------------------------------------------------------
-Sharpe Ratio:            1.234
-Max Drawdown:            -8.50%
-Total Return:            12.45%
-================================================================================
-```
-
-## 📚 Próximos Passos
-
-1. Adicionar mais estratégias (RSI, Bollinger Bands, etc.)
-2. Criar recipes para otimização de parâmetros
-3. Adicionar suporte para múltiplos símbolos
-4. Implementar walk-forward analysis
-5. Adicionar visualizações (gráficos)
-
-## 📝 Licença
-
-Projeto educacional - use como base para seus próprios backtests.
+Educational use only—adapt freely for your own research and backtests.

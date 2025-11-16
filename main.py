@@ -160,10 +160,28 @@ def run_recipe_programmatic(
         **kwargs
     )
     
-    # Add data for chart
-    results['data'] = df
+    # Transform results dict to match Streamlit expectations
+    analyzers = results.get('analyzers', {})
     
-    return results
+    transformed_results = {
+        'initial_value': results.get('initial_value', 0),
+        'final_value': results.get('final_value', 0),
+        'total_pnl': results.get('pnl', 0),
+        'total_return': results.get('return_pct', 0),  # Rename: return_pct -> total_return
+        'sharpe_ratio': analyzers.get('sharpe'),       # Flatten from analyzers
+        'max_drawdown': analyzers.get('max_drawdown'),
+        'total_trades': analyzers.get('total_trades', 0),
+        'won_trades': analyzers.get('won_trades', 0),
+        'lost_trades': analyzers.get('lost_trades', 0),
+        'win_rate': (analyzers.get('won_trades', 0) / analyzers.get('total_trades', 1) * 100) if analyzers.get('total_trades', 0) > 0 else 0,
+        'data': df,
+        'symbol': symbol,
+        'start': start,
+        'end': end,
+        'strategy': results.get('strategy')
+    }
+    
+    return transformed_results
 
 
 def run_recipe(args):

@@ -1,176 +1,87 @@
-# Implementação Loguru + Rich - Resumo
-
-## ✅ Implementado
-
-### 1. Dependências Adicionadas
-- ✅ `loguru` - Logging estruturado e colorido
-- ✅ `rich` - Interface de usuário aprimorada no terminal
-
-### 2. Módulo de Logging (`utils/logger.py`)
-- ✅ Configuração centralizada do Loguru
-- ✅ Console output com cores (Rich integration)
-- ✅ Arquivo de log com rotação automática (10 MB)
-- ✅ Compressão de logs antigos (ZIP)
-- ✅ Retenção de 7 dias
-- ✅ Global console instance para Rich
-
-### 3. BaseEngine Atualizado
-- ✅ Logger disponível em `self.logger` para todas engines
-- ✅ Inicialização automática no `__init__`
-
-### 4. BaseStrategy Atualizado  
-- ✅ Logger disponível em `self.logger` para todas strategies
-- ✅ Método `log()` agora usa loguru ao invés de print
-- ✅ Logs de trading (buy/sell/trades) funcionais
-
-### 5. Main CLI com Rich
-- ✅ Console colorido com Rich
-- ✅ Tabelas formatadas para resultados
-- ✅ Painéis (Panels) para headers
-- ✅ Mensagens de erro/sucesso coloridas
-- ✅ Confirmação interativa com Rich.Prompt
-- ✅ Todos prints convertidos para console.print()
-
-### 6. BacktestEngine com Rich
-- ✅ Progress bars durante execução
-- ✅ Mensagens coloridas (warnings, errors)
-- ✅ Output formatado de resultados
-- ✅ Logger integrado
-
-### 7. DataEngine com Rich
-- ✅ Console output formatado
-- ✅ Mensagens de status coloridas
-- ✅ Logger para operações de dados
-- ✅ Tabelas de informação de cache
-
-## 📋 Estrutura de Arquivos
-
-```
 wawastock/
+# Platform Implementation Summary
+
+This document captures the major architectural upgrades recently completed across the WawaStock framework. Use it as a high-level map when navigating the engines, logging/reporting stack, and UI surfaces.
+
+## Highlights
+
+| Area | What changed | Why it matters |
+|------|--------------|----------------|
+| Logging & Reporting | Introduced Loguru-based `utils/logger.py`, colorized Rich console output, and the centralized `ReportEngine`. | Every CLI/recipe emits consistent, professional output and writes rotating logs automatically. |
+| Engines | `BaseEngine`/`BaseStrategy` inject shared logger + Rich console; `BacktestEngine` now handles analyzers and presentation; `DataEngine` integrates with DuckDB + indicator presets. | Common behaviors live in one place, reducing duplicate code across strategies and workflows. |
+| Indicators | New `IndicatorsEngine` with preset sets (`minimal`, `standard`, `full`) and automatic persistence to Parquet. | Strategies and Streamlit visualizations can rely on precomputed SMA/EMA/RSI/MACD/ATR/etc. columns without recalculating. |
+| Recipes & CLI | `main.py` gained programmatic hooks (`run_recipe_programmatic`), recipe registry expansion, and Rich-powered argument summaries. | Streamlit bridge reuses CLI logic; new recipes (RSI, MACD+EMA, Bollinger+RSI, Multi-Timeframe) follow the same pattern. |
+| Streamlit | Scripts (`start.sh`) launch a multi-page dashboard; shared engines feed charts, trade tables, and metrics cards. | Users can run backtests visually without diverging from CLI behavior. |
+
+## Component Breakdown
+
+1. **`utils/logger.py`**
+    - `setup_logger` configures Loguru once (10 MB rotation, 7-day retention, ZIP compression, Rich colorization).
+    - `get_logger` returns module-level loggers reused by engines, strategies, recipes, and Streamlit bridge modules.
+
+2. **`engines/report_engine.py`**
+    - Wraps Rich panels/tables/status badges.
+    - Ensures analyzer metrics (Sharpe, drawdown, etc.) share a single formatting pipeline.
+    - New recipes instantiate `ReportEngine` in `__init__` and never print directly.
+
+3. **`engines/data_engine.py` + `engines/indicators_engine.py`**
+    - Automatic indicator enrichment controlled via `auto_indicators` & `indicator_set`.
+    - DuckDB caching plus local-first fetch helpers (Yahoo, Binance, CCXT, Alpaca).
+    - Rich-based status messaging when running from CLI.
+
+4. **`engines/backtest_engine.py`**
+    - Registers analyzers (Sharpe, Max Drawdown, Returns, Trade Analyzer).
+    - Normalizes backtest result dictionaries so both CLI and Streamlit can consume the same payload.
+    - Integrates with `ReportEngine` for progress and output tables.
+
+5. **Recipes & Strategies**
+    - Five-tier strategy stack (Sample SMA → Multi-Timeframe momentum) with dedicated recipes.
+    - `main.py` registries (`RECIPE_REGISTRY`, `STRATEGY_REGISTRY`) map command names to classes.
+    - Programmatic entry point (`run_recipe_programmatic`) powers Streamlit.
+
+6. **Streamlit bridge (`streamlit_components/bridge.py`)**
+    - Initializes `DataEngine` + `BacktestEngine` once per session.
+    - Runs recipes with the same parameters as CLI and returns JSON-friendly metrics/charts/trades.
+
+## File Map Snapshot
+
+```
+
 ├── utils/
-│   ├── __init__.py
-│   └── logger.py              # ✅ NOVO - Configuração centralizada
+│   └── logger.py               # Loguru setup + helpers
 ├── engines/
-│   ├── base_engine.py         # ✅ MODIFICADO - Logger integrado
-│   ├── backtest_engine.py     # ✅ MODIFICADO - Rich progress
-│   └── data_engine.py         # ✅ MODIFICADO - Rich console
-├── strategies/
-│   └── base_strategy.py       # ✅ MODIFICADO - Logger integrado
-├── main.py                    # ✅ MODIFICADO - Rich CLI
-├── requirements.txt           # ✅ MODIFICADO - Deps adicionadas
-├── demo_logging_rich.py       # ✅ NOVO - Script de demonstração
-└── LOGGING.md                 # ✅ NOVO - Documentação
+│   ├── base_engine.py          # Shared logger/console wiring
+│   ├── data_engine.py          # DuckDB, Parquet, indicators, sources
+│   ├── indicators_engine.py    # pandas-ta presets
+│   ├── backtest_engine.py      # Backtrader wrapper + analyzers
+│   ├── report_engine.py        # Rich presentation layer
+│   └── ...
+├── recipes/                    # sample, rsi, macd_ema, bollinger_rsi, multi_timeframe
+├── strategies/                 # matching strategy implementations
+├── main.py                     # CLI + programmatic bridge
+├── streamlit_pages/            # Multi-page Streamlit UI
+└── scripts/                    # Data utilities & diagnostics
 ```
 
-## 🎨 Features do Rich
-
-### Tabelas Formatadas
-```python
-from rich.table import Table
-
-table = Table(title="Results")
-table.add_column("Metric", style="cyan")
-table.add_column("Value", style="green")
-console.print(table)
-```
-
-### Painéis
-```python
-from rich.panel import Panel
-
-console.print(Panel.fit(
-    "[bold green]SUCCESS[/bold green]",
-    border_style="green"
-))
-```
-
-### Progress Bars
-```python
-from rich.progress import Progress
-
-with Progress() as progress:
-    task = progress.add_task("Working...", total=100)
-```
-
-### Cores e Ícones
-```python
-console.print("[green]✓ Success[/green]")
-console.print("[red]✗ Error[/red]")
-console.print("[yellow]⚠️  Warning[/yellow]")
-```
-
-## 📝 Níveis de Log (Loguru)
-
-| Nível    | Uso                                    |
-|----------|----------------------------------------|
-| DEBUG    | Informações detalhadas para debugging  |
-| INFO     | Eventos gerais do sistema              |
-| WARNING  | Avisos de possíveis problemas          |
-| ERROR    | Erros que não param a execução         |
-| CRITICAL | Erros críticos do sistema              |
-
-## 🔥 Exemplos de Uso
-
-### Em Engines
-```python
-class MyEngine(BaseEngine):
-    def run(self):
-        self.logger.info("Starting engine")
-        self.logger.debug(f"Config: {self.config}")
-```
-
-### Em Strategies
-```python
-class MyStrategy(BaseStrategy):
-    def next(self):
-        self.logger.debug(f"Price: {self.data.close[0]}")
-        if self.signal:
-            self.buy()
-```
-
-### No CLI
-```bash
-python main.py run-strategy --strategy rsi --symbol AAPL --start 2020-01-01 --end 2020-12-31
-```
-
-Output com tabelas coloridas, painéis e progress bars! ✨
-
-## 🧪 Testar
+## Testing / Verification
 
 ```bash
-# Ativar venv
 source venv/bin/activate
-
-# Rodar demo
-python demo_logging_rich.py
-
-# Ver logs
+python main.py run-recipe --name rsi --symbol AAPL
+python main.py run-recipe --name multi_timeframe --symbol NVDA --start 2020-01-01 --end 2023-12-31
 tail -f logs/wawastock.log
 ```
 
-## 📦 Instalação (no venv)
+- Rich output should show headers, status icons, and analyzer tables without manual prints.
+- Log file should capture the same messages with timestamps.
+- Streamlit (`./start.sh`) consumes the same engines; verify metrics on the Backtest Runner page.
 
-```bash
-# Criar venv (se não existe)
-python3 -m venv venv
+## Next Internal Improvements
 
-# Ativar
-source venv/bin/activate
+1. **Report exports** – generate HTML/PDF output using ReportEngine templates.
+2. **Extended analyzers** – add Sortino, Calmar, or custom risk metrics to `BacktestEngine`.
+3. **Indicator presets UI** – expose preset toggles directly in Streamlit Data Manager.
+4. **Recipe scaffolder** – script to generate template recipes/strategies with logging wired in.
 
-# Instalar
-pip install loguru rich
-# ou
-pip install -r requirements.txt
-```
-
-## 🎉 Resultado
-
-- ✅ Logging estruturado e colorido em todo o framework
-- ✅ CLI visualmente bonito com Rich
-- ✅ Progress bars para operações longas
-- ✅ Tabelas formatadas para resultados
-- ✅ Mensagens claras e coloridas
-- ✅ Logs em arquivo com rotação automática
-- ✅ Fácil de usar e manter
-
-Tudo funcionando! 🚀
+Keeping this summary up to date helps new contributors understand the system boundaries quickly and ensures future migrations (e.g., new data sources or UI components) follow the same patterns.
+### Progress Bars
