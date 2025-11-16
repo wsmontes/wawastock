@@ -3,6 +3,7 @@ Base strategy module - Base class for all trading strategies.
 """
 
 import backtrader as bt
+from utils.logger import get_logger
 
 
 class BaseStrategy(bt.Strategy):
@@ -17,6 +18,11 @@ class BaseStrategy(bt.Strategy):
     - next: to define trading logic
     """
     
+    def __init__(self):
+        """Initialize base strategy with logger."""
+        super().__init__()
+        self.logger = get_logger(self.__class__.__name__)
+    
     def log(self, txt, dt=None):
         """
         Logging helper for strategy events.
@@ -25,11 +31,8 @@ class BaseStrategy(bt.Strategy):
             txt: Text to log
             dt: Optional datetime (uses current data datetime if not provided)
         """
-        # Disabled by default to improve performance
-        # Uncomment the lines below to enable verbose logging
-        # dt = dt or self.datas[0].datetime.date(0)
-        # print(f'{dt.isoformat()} {txt}')
-        pass
+        dt = dt or self.datas[0].datetime.date(0)
+        self.logger.debug(f'{dt.isoformat()} {txt}')
     
     def notify_order(self, order):
         """

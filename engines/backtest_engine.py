@@ -5,8 +5,13 @@ Backtest engine module - Handles backtest execution using backtrader.
 from typing import Type, Dict, Any, List
 import pandas as pd
 import backtrader as bt
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from .base_engine import BaseEngine
+
+
+console = Console()
 
 
 class BacktestEngine(BaseEngine):
@@ -30,6 +35,7 @@ class BacktestEngine(BaseEngine):
             commission: Commission rate (0.001 = 0.1%)
             stake: Default number of shares/contracts per trade
         """
+        super().__init__()
         self.initial_cash = initial_cash
         self.commission = commission
         self.stake = stake
@@ -86,19 +92,19 @@ class BacktestEngine(BaseEngine):
         """
         # Validate data
         if data_df.empty:
-            raise ValueError("❌ Cannot run backtest: DataFrame is empty")
+            raise ValueError("Cannot run backtest: DataFrame is empty")
         
         min_bars_required = 250  # Conservative minimum for most indicators
         if len(data_df) < min_bars_required:
-            print(f"\n⚠️  WARNING: Dataset has only {len(data_df)} bars")
-            print(f"   Recommended minimum: {min_bars_required} bars")
-            print(f"   Strategy may not have enough data for indicators to initialize properly")
-            print(f"   Consider using a longer time period for more reliable results\n")
+            console.print(f"\n[yellow]⚠️  WARNING: Dataset has only {len(data_df)} bars[/yellow]")
+            console.print(f"[yellow]   Recommended minimum: {min_bars_required} bars[/yellow]")
+            console.print(f"[yellow]   Strategy may not have enough data for indicators to initialize properly[/yellow]")
+            console.print(f"[yellow]   Consider using a longer time period for more reliable results[/yellow]\n")
             
             # Check if we have at least bare minimum
             if len(data_df) < 50:
                 raise ValueError(
-                    f"❌ Insufficient data: {len(data_df)} bars\n"
+                    f"Insufficient data: {len(data_df)} bars\n"
                     f"   Minimum required: 50 bars\n"
                     f"   Please use a longer time period (e.g., --start 2023-01-01 --end 2023-12-31)"
                 )
@@ -107,11 +113,11 @@ class BacktestEngine(BaseEngine):
         required_cols = ['open', 'high', 'low', 'close', 'volume']
         missing_cols = [col for col in required_cols if col not in data_df.columns]
         if missing_cols:
-            raise ValueError(f"❌ Missing required columns: {missing_cols}")
+            raise ValueError(f"Missing required columns: {missing_cols}")
         
         # Check for NaN values
         if data_df[required_cols].isnull().any().any():
-            print("⚠️  Warning: Data contains NaN values, filling forward...")
+            console.print("[yellow]⚠️  Warning: Data contains NaN values, filling forward...[/yellow]")
             data_df = data_df.ffill().bfill()
         
         # Create Cerebro
@@ -138,22 +144,32 @@ class BacktestEngine(BaseEngine):
         # Get initial value
         initial_value = cerebro.broker.getvalue()
         
-        # Run backtest
-        print(f"Starting Portfolio Value: ${initial_value:,.2f}")
-        print(f"Running backtest with {len(data_df)} bars...")
+        # Run backtest with progress indicator
+        self.logger.info(f"Starting Portfolio Value: ${initial_value:,.2f}")
+        self.logger.info(f"Running backtest with {len(data_df)} bars...")
         
-        try:
-            results = cerebro.run()
-        except Exception as e:
-            raise RuntimeError(f"❌ Backtest execution failed: {str(e)}")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("[cyan]Running backtest...", total=None)
+            
+            try:
+                results = cerebro.run()
+                progress.update(task, completed=True)
+            except Exception as e:
+                progress.stop()
+                raise RuntimeError(f"Backtest execution failed: {str(e)}")
         
         # Get final value
         final_value = cerebro.broker.getvalue()
         pnl = final_value - initial_value
         return_pct = (pnl / initial_value) * 100
         
-        print(f"Final Portfolio Value: ${final_value:,.2f}")
-        print(f"PnL: ${pnl:,.2f} ({return_pct:.2f}%)")
+        self.logger.info(f"Final Portfolio Value: ${final_value:,.2f}")
+        pnl_color = "green" if pnl >= 0 else "red"
+        console.print(f"PnL: [{pnl_color}]${pnl:,.2f} ({return_pct:.2f}%)[/{pnl_color}]")
         
         # Extract analyzer results
         strategy = results[0]

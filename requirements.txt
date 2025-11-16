@@ -3,6 +3,8 @@ backtrader
 pandas
 pyarrow
 duckdb
+loguru
+rich
 
 # Data sources (optional - install as needed)
 # Yahoo Finance

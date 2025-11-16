@@ -23,6 +23,7 @@ from typing import Optional, Dict, Any
 import pandas as pd
 import duckdb
 from pathlib import Path
+from rich.console import Console
 
 from .base_engine import BaseEngine
 from .local_data_store import LocalDataStore
@@ -32,6 +33,9 @@ from .data_sources import (
     AlpacaDataSource,
     CCXTDataSource
 )
+
+
+console = Console()
 
 
 class DataEngine(BaseEngine):
@@ -57,6 +61,7 @@ class DataEngine(BaseEngine):
             db_path: Path to DuckDB database file
             use_cache: Enable local-first caching (recommended)
         """
+        super().__init__()
         self.db_path = db_path
         self.use_cache = use_cache
         
@@ -251,7 +256,7 @@ class DataEngine(BaseEngine):
         if not parquet_path.exists():
             # Try to load from cache if available
             if self.use_cache:
-                print(f"Processed file not found. Attempting to load from cache...")
+                self.logger.info("Processed file not found. Attempting to load from cache...")
                 try:
                     # Try Yahoo first (most common for stocks)
                     df = self.get_ohlcv_cached(
@@ -262,7 +267,7 @@ class DataEngine(BaseEngine):
                         end=end
                     )
                     if not df.empty:
-                        print(f"Loaded {len(df)} bars from cache")
+                        console.print(f"[green]✓[/green] Loaded {len(df)} bars from cache")
                         
                         # Convert timestamp column to datetime index
                         if 'timestamp' in df.columns:
@@ -286,7 +291,7 @@ class DataEngine(BaseEngine):
                         
                         return df
                 except Exception as e:
-                    print(f"Could not load from cache: {e}")
+                    self.logger.warning(f"Could not load from cache: {e}")
             
             raise FileNotFoundError(f"Data file not found: {parquet_path}")
         
@@ -405,7 +410,7 @@ class DataEngine(BaseEngine):
             df_save = df.reset_index()
             df_save.to_parquet(filepath, index=False)
             
-            print(f"✓ Saved to {filepath}")
+            console.print(f"[green]✓[/green] Saved to {filepath}")
         
         return df
     

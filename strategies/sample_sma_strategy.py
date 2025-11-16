@@ -36,6 +36,7 @@ class SampleSMAStrategy(BaseStrategy):
         Creates two SMA indicators based on the close price.
         Also creates a crossover indicator to detect when SMAs cross.
         """
+        super().__init__()
         # Keep reference to the "close" line in the data[0] dataseries
         self.dataclose = self.datas[0].close
         

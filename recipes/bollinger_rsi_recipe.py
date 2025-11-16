@@ -7,6 +7,7 @@ sophisticated risk management and exit strategies.
 
 from recipes.base_recipe import BaseRecipe
 from strategies.bollinger_rsi_strategy import BollingerRSIStrategy
+from engines.report_engine import ReportEngine
 
 
 class BollingerRSIRecipe(BaseRecipe):
@@ -16,6 +17,11 @@ class BollingerRSIRecipe(BaseRecipe):
     Combines volatility analysis with momentum indicators for high-probability
     mean reversion trades with ATR-based position sizing.
     """
+    
+    def __init__(self, data_engine, backtest_engine):
+        """Initialize recipe with engines."""
+        super().__init__(data_engine, backtest_engine)
+        self.report = ReportEngine()
     
     def run(
         self,
@@ -41,36 +47,42 @@ class BollingerRSIRecipe(BaseRecipe):
             risk_per_trade: Risk per trade as % of equity (default: 0.02 = 2%)
             partial_take_profit: % to close at first target (default: 0.5 = 50%)
         """
-        print("=" * 80)
-        print("ADVANCED STRATEGY: Bollinger Bands + RSI Mean Reversion")
-        print("=" * 80)
-        print(f"Symbol: {symbol}")
-        print(f"Period: {start} to {end}")
-        print(f"Bollinger Bands: {bb_period} period, {bb_dev} std dev")
-        print(f"RSI: {rsi_period} period")
-        print(f"Risk Per Trade: {risk_per_trade*100:.1f}%")
-        print(f"Partial Profit: {partial_take_profit*100:.0f}% at mid-BB")
-        print("=" * 80)
-        print()
+        # Print strategy header
+        self.report.print_strategy_header(
+            strategy_name="Bollinger Bands + RSI Mean Reversion",
+            symbol=symbol,
+            start=start,
+            end=end,
+            params={
+                'bollinger': f"{bb_period} period, {bb_dev} std dev",
+                'rsi': f"{rsi_period} period",
+                'risk_per_trade': f"{risk_per_trade*100:.1f}%",
+                'partial_profit': f"{partial_take_profit*100:.0f}% at mid-BB"
+            }
+        )
         
         # Load data
-        print(f"Loading data for {symbol}...")
+        self.report.print_step(f"Loading data for {symbol}...")
         try:
             data_df = self.data_engine.load_prices(
                 symbol=symbol,
                 start=start,
                 end=end
             )
-            print(f"Loaded {len(data_df)} bars of data")
-            print()
+            self.report.print_data_summary(
+                rows=len(data_df),
+                start_date=str(data_df.index[0].date()),
+                end_date=str(data_df.index[-1].date())
+            )
         except FileNotFoundError as e:
-            print(f"ERROR: {e}")
-            print(f"Hint: Run 'python main.py data load {symbol}' to download data")
+            self.report.print_error(
+                "Data not found",
+                f"Run 'python main.py data load {symbol}' to download data"
+            )
             return
         
         # Run backtest
-        print("Running backtest...")
-        print()
+        self.report.print_step("Running backtest...")
         results = self.backtest_engine.run_backtest(
             strategy_cls=BollingerRSIStrategy,
             data_df=data_df,
@@ -82,24 +94,4 @@ class BollingerRSIRecipe(BaseRecipe):
         )
         
         # Display results
-        print()
-        print("=" * 80)
-        print("BACKTEST RESULTS")
-        print("=" * 80)
-        print(f"Final Portfolio Value: ${results['final_value']:,.2f}")
-        print(f"Total Return: {results['return_pct']:.2f}%")
-        print()
-        print("Strategy Overview:")
-        print("- Entry: Price at lower BB + RSI oversold")
-        print("- Partial Exit: 50% at middle BB or RSI > 50")
-        print("- Full Exit: Upper BB or RSI overbought")
-        print("- Position Sizing: ATR-based (2% risk per trade)")
-        print("- Risk Management: Trailing stop after partial profit")
-        print()
-        print("Key Features:")
-        print("✓ Volatility-adjusted support/resistance levels")
-        print("✓ ATR-based dynamic position sizing")
-        print("✓ Partial profit taking for consistent gains")
-        print("✓ Trailing stop protects remaining position")
-        print("✓ Multi-layered exit strategy")
-        print("=" * 80)
+        self.report.print_backtest_results(results)

@@ -14,6 +14,13 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich import box
+
+from utils.logger import get_logger, setup_logger
+
 from engines.data_engine import DataEngine
 from engines.backtest_engine import BacktestEngine
 
@@ -30,6 +37,10 @@ from strategies.rsi_strategy import RSIStrategy
 from strategies.macd_ema_strategy import MACDEMAStrategy
 from strategies.bollinger_rsi_strategy import BollingerRSIStrategy
 from strategies.multi_timeframe_strategy import MultiTimeframeMomentumStrategy
+
+# Initialize console and logger
+console = Console()
+logger = get_logger(__name__)
 
 
 # Registry mapping names to classes
@@ -60,8 +71,8 @@ def run_recipe(args):
     recipe_name = args.name
     
     if recipe_name not in RECIPE_REGISTRY:
-        print(f"ERROR: Recipe '{recipe_name}' not found.")
-        print(f"Available recipes: {', '.join(RECIPE_REGISTRY.keys())}")
+        console.print(f"[red]ERROR: Recipe '{recipe_name}' not found.[/red]")
+        console.print(f"Available recipes: {', '.join(RECIPE_REGISTRY.keys())}")
         sys.exit(1)
     
     # Initialize engines
@@ -97,8 +108,8 @@ def run_strategy(args):
     strategy_name = args.strategy
     
     if strategy_name not in STRATEGY_REGISTRY:
-        print(f"ERROR: Strategy '{strategy_name}' not found.")
-        print(f"Available strategies: {', '.join(STRATEGY_REGISTRY.keys())}")
+        console.print(f"[red]ERROR: Strategy '{strategy_name}' not found.[/red]")
+        console.print(f"Available strategies: {', '.join(STRATEGY_REGISTRY.keys())}")
         sys.exit(1)
     
     # Initialize engines
@@ -108,27 +119,33 @@ def run_strategy(args):
         commission=args.commission
     )
     
-    print("=" * 80)
-    print(f"RUNNING STRATEGY: {strategy_name}")
-    print("=" * 80)
-    print(f"Symbol: {args.symbol}")
-    print(f"Period: {args.start} to {args.end}")
-    print("=" * 80)
-    print()
+    # Display header
+    console.print(Panel.fit(
+        f"[bold cyan]RUNNING STRATEGY: {strategy_name}[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    table = Table(show_header=False, box=box.SIMPLE)
+    table.add_row("[cyan]Symbol:[/cyan]", args.symbol)
+    table.add_row("[cyan]Period:[/cyan]", f"{args.start} to {args.end}")
+    table.add_row("[cyan]Initial Cash:[/cyan]", f"${args.cash:,.2f}")
+    table.add_row("[cyan]Commission:[/cyan]", f"{args.commission:.3%}")
+    console.print(table)
+    console.print()
     
     # Load data
-    print(f"Loading data for {args.symbol}...")
+    logger.info(f"Loading data for {args.symbol}...")
     try:
         data_df = data_engine.load_prices(
             symbol=args.symbol,
             start=args.start,
             end=args.end
         )
-        print(f"Loaded {len(data_df)} bars of data")
-        print()
+        console.print(f"[green]✓[/green] Loaded {len(data_df)} bars of data")
+        console.print()
     except FileNotFoundError as e:
-        print(f"ERROR: {e}")
-        print(f"Please create a data file at: data/processed/{args.symbol}.parquet")
+        console.print(f"[red]ERROR: {e}[/red]")
+        console.print(f"[yellow]Please create a data file at: data/processed/{args.symbol}.parquet[/yellow]")
         sys.exit(1)
     
     # Prepare strategy parameters
@@ -142,47 +159,64 @@ def run_strategy(args):
         if args.slow:
             strategy_params['slow_period'] = args.slow
         
-        print(f"Strategy Parameters:")
-        print(f"  Fast Period: {strategy_params.get('fast_period', 10)}")
-        print(f"  Slow Period: {strategy_params.get('slow_period', 20)}")
-        print()
+        param_table = Table(title="Strategy Parameters", box=box.ROUNDED)
+        param_table.add_column("Parameter", style="cyan")
+        param_table.add_column("Value", style="green")
+        param_table.add_row("Fast Period", str(strategy_params.get('fast_period', 10)))
+        param_table.add_row("Slow Period", str(strategy_params.get('slow_period', 20)))
+        console.print(param_table)
+        console.print()
     
     # Run backtest
-    print("Running backtest...")
-    print()
+    logger.info("Running backtest...")
     results = backtest_engine.run_backtest(
         strategy_cls=strategy_cls,
         data_df=data_df,
         **strategy_params
     )
     
-    # Display results
-    print()
-    print("=" * 80)
-    print("BACKTEST RESULTS")
-    print("=" * 80)
-    print(f"Initial Portfolio Value: ${results['initial_value']:,.2f}")
-    print(f"Final Portfolio Value:   ${results['final_value']:,.2f}")
-    print(f"Profit/Loss:             ${results['pnl']:,.2f}")
-    print(f"Return:                  {results['return_pct']:.2f}%")
+    # Display results with rich formatting
+    console.print()
+    console.print(Panel.fit(
+        "[bold green]BACKTEST RESULTS[/bold green]",
+        border_style="green"
+    ))
+    
+    results_table = Table(box=box.ROUNDED, show_header=False)
+    results_table.add_column("Metric", style="cyan", no_wrap=True)
+    results_table.add_column("Value", style="bold")
+    
+    results_table.add_row("Initial Portfolio Value", f"[white]${results['initial_value']:,.2f}[/white]")
+    results_table.add_row("Final Portfolio Value", f"[white]${results['final_value']:,.2f}[/white]")
+    
+    pnl_color = "green" if results['pnl'] >= 0 else "red"
+    results_table.add_row("Profit/Loss", f"[{pnl_color}]${results['pnl']:,.2f}[/{pnl_color}]")
+    
+    return_color = "green" if results['return_pct'] >= 0 else "red"
+    results_table.add_row("Return", f"[{return_color}]{results['return_pct']:.2f}%[/{return_color}]")
+    
+    console.print(results_table)
     
     if results['analyzers']:
-        print()
-        print("Performance Metrics:")
-        print("-" * 80)
+        console.print()
+        perf_table = Table(title="Performance Metrics", box=box.ROUNDED)
+        perf_table.add_column("Metric", style="cyan")
+        perf_table.add_column("Value", style="bold")
         
         analyzers = results['analyzers']
         
         if 'sharpe' in analyzers and analyzers['sharpe']:
-            print(f"Sharpe Ratio:            {analyzers['sharpe']:.3f}")
+            perf_table.add_row("Sharpe Ratio", f"{analyzers['sharpe']:.3f}")
         
         if 'max_drawdown' in analyzers and analyzers['max_drawdown']:
-            print(f"Max Drawdown:            {analyzers['max_drawdown']:.2f}%")
+            perf_table.add_row("Max Drawdown", f"{analyzers['max_drawdown']:.2f}%")
         
         if 'total_return' in analyzers and analyzers['total_return']:
-            print(f"Total Return:            {analyzers['total_return']:.2f}%")
+            perf_table.add_row("Total Return", f"{analyzers['total_return']:.2f}%")
+        
+        console.print(perf_table)
     
-    print("=" * 80)
+    console.print()
 
 
 def fetch_data(args):
@@ -194,16 +228,17 @@ def fetch_data(args):
     """
     data_engine = DataEngine()
     
-    print("=" * 80)
-    print(f"FETCHING DATA FROM: {args.source.upper()}")
-    print("=" * 80)
+    console.print(Panel.fit(
+        f"[bold cyan]FETCHING DATA FROM: {args.source.upper()}[/bold cyan]",
+        border_style="cyan"
+    ))
     
     # Prepare source parameters
     source_params = {}
     
     if args.source.lower() == 'alpaca':
         if not args.api_key or not args.api_secret:
-            print("ERROR: Alpaca requires --api-key and --api-secret")
+            console.print("[red]ERROR: Alpaca requires --api-key and --api-secret[/red]")
             sys.exit(1)
         source_params['api_key'] = args.api_key
         source_params['api_secret'] = args.api_secret
@@ -232,20 +267,27 @@ def fetch_data(args):
             **source_params
         )
         
-        print()
-        print("=" * 80)
-        print("DATA SUMMARY")
-        print("=" * 80)
-        print(f"Rows: {len(df)}")
-        print(f"Date Range: {df.index[0]} to {df.index[-1]}")
-        print(f"Columns: {', '.join(df.columns)}")
-        print()
-        print("First few rows:")
-        print(df.head())
-        print("=" * 80)
+        console.print()
+        console.print(Panel.fit(
+            "[bold green]DATA SUMMARY[/bold green]",
+            border_style="green"
+        ))
+        
+        summary_table = Table(box=box.ROUNDED, show_header=False)
+        summary_table.add_column("Property", style="cyan")
+        summary_table.add_column("Value", style="white")
+        
+        summary_table.add_row("Rows", f"{len(df):,}")
+        summary_table.add_row("Date Range", f"{df.index[0]} to {df.index[-1]}")
+        summary_table.add_row("Columns", ", ".join(df.columns))
+        
+        console.print(summary_table)
+        console.print()
+        console.print("[cyan]First few rows:[/cyan]")
+        console.print(df.head())
         
     except Exception as e:
-        print(f"ERROR: {e}")
+        console.print(f"[red]ERROR: {e}[/red]")
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -260,16 +302,17 @@ def get_cached(args):
     """
     data_engine = DataEngine(use_cache=True)
     
-    print("=" * 80)
-    print(f"FETCHING WITH LOCAL-FIRST CACHE: {args.source.upper()}")
-    print("=" * 80)
+    console.print(Panel.fit(
+        f"[bold cyan]FETCHING WITH LOCAL-FIRST CACHE: {args.source.upper()}[/bold cyan]",
+        border_style="cyan"
+    ))
     
     # Prepare source parameters
     source_params = {}
     
     if args.source.lower() == 'alpaca':
         if not args.api_key or not args.api_secret:
-            print("ERROR: Alpaca requires --api-key and --api-secret")
+            console.print("[red]ERROR: Alpaca requires --api-key and --api-secret[/red]")
             sys.exit(1)
         source_params['api_key'] = args.api_key
         source_params['api_secret'] = args.api_secret
@@ -297,24 +340,34 @@ def get_cached(args):
             **source_params
         )
         
-        print()
-        print("=" * 80)
-        print("DATA SUMMARY")
-        print("=" * 80)
-        print(f"Rows: {len(df)}")
+        console.print()
+        console.print(Panel.fit(
+            "[bold green]DATA SUMMARY[/bold green]",
+            border_style="green"
+        ))
+        
+        summary_table = Table(box=box.ROUNDED, show_header=False)
+        summary_table.add_column("Property", style="cyan")
+        summary_table.add_column("Value", style="white")
+        
+        summary_table.add_row("Rows", f"{len(df):,}")
+        
         if not df.empty:
-            print(f"Date Range: {df['timestamp'].min()} to {df['timestamp'].max()}")
-            print(f"Columns: {', '.join(df.columns)}")
-            print()
-            print("First few rows:")
-            print(df.head())
-            print()
-            print("Last few rows:")
-            print(df.tail())
-        print("=" * 80)
+            summary_table.add_row("Date Range", f"{df['timestamp'].min()} to {df['timestamp'].max()}")
+            summary_table.add_row("Columns", ", ".join(df.columns))
+        
+        console.print(summary_table)
+        
+        if not df.empty:
+            console.print()
+            console.print("[cyan]First few rows:[/cyan]")
+            console.print(df.head())
+            console.print()
+            console.print("[cyan]Last few rows:[/cyan]")
+            console.print(df.tail())
         
     except Exception as e:
-        print(f"ERROR: {e}")
+        console.print(f"[red]ERROR: {e}[/red]")
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -329,23 +382,33 @@ def cache_info(args):
     """
     data_engine = DataEngine(use_cache=True)
     
-    print("=" * 80)
-    print("CACHE COVERAGE INFORMATION")
-    print("=" * 80)
-    print()
+    console.print(Panel.fit(
+        "[bold cyan]CACHE COVERAGE INFORMATION[/bold cyan]",
+        border_style="cyan"
+    ))
+    console.print()
     
     df = data_engine.get_coverage_info(source=args.source)
     
     if df.empty:
-        print("No cached data found.")
+        console.print("[yellow]No cached data found.[/yellow]")
     else:
-        print(df.to_string(index=False))
-        print()
-        print(f"Total datasets: {len(df)}")
-        print(f"Total days cached: {df['days'].sum()}")
-        print(f"Total rows: {df['total_rows'].sum():,.0f}")
-    
-    print("=" * 80)
+        # Create rich table from dataframe
+        table = Table(box=box.ROUNDED)
+        for col in df.columns:
+            table.add_column(col, style="cyan")
+        
+        for _, row in df.iterrows():
+            table.add_row(*[str(v) for v in row])
+        
+        console.print(table)
+        console.print()
+        
+        summary_table = Table(show_header=False, box=box.SIMPLE)
+        summary_table.add_row("[cyan]Total datasets:[/cyan]", str(len(df)))
+        summary_table.add_row("[cyan]Total days cached:[/cyan]", str(df['days'].sum()))
+        summary_table.add_row("[cyan]Total rows:[/cyan]", f"{df['total_rows'].sum():,.0f}")
+        console.print(summary_table)
 
 
 def cache_clear(args):
@@ -357,18 +420,19 @@ def cache_clear(args):
     """
     data_engine = DataEngine(use_cache=True)
     
-    print("=" * 80)
-    print("CLEARING CACHE")
-    print("=" * 80)
+    console.print(Panel.fit(
+        "[bold yellow]CLEARING CACHE[/bold yellow]",
+        border_style="yellow"
+    ))
     
     if not args.source and not args.symbol:
-        confirm = input("Clear ALL cached data? This cannot be undone. (yes/no): ")
-        if confirm.lower() != 'yes':
-            print("Cancelled.")
+        from rich.prompt import Confirm
+        if not Confirm.ask("[bold red]Clear ALL cached data? This cannot be undone.[/bold red]"):
+            console.print("[yellow]Cancelled.[/yellow]")
             return
     
     data_engine.clear_cache(source=args.source, symbol=args.symbol)
-    print("=" * 80)
+    console.print("[green]✓ Cache cleared successfully[/green]")
 
 
 def main():

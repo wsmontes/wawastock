@@ -9,6 +9,7 @@ This recipe demonstrates a complete backtest workflow:
 
 from recipes.base_recipe import BaseRecipe
 from strategies.sample_sma_strategy import SampleSMAStrategy
+from engines.report_engine import ReportEngine
 
 
 class SampleRecipe(BaseRecipe):
@@ -20,6 +21,11 @@ class SampleRecipe(BaseRecipe):
     - Execute a strategy using BacktestEngine
     - Present results to the user
     """
+    
+    def __init__(self, data_engine, backtest_engine):
+        """Initialize recipe with engines."""
+        super().__init__(data_engine, backtest_engine)
+        self.report = ReportEngine()
     
     def run(
         self,
@@ -39,33 +45,40 @@ class SampleRecipe(BaseRecipe):
             fast_period: Fast SMA period (default: 10)
             slow_period: Slow SMA period (default: 20)
         """
-        print("=" * 80)
-        print("SAMPLE RECIPE: SMA Crossover Strategy")
-        print("=" * 80)
-        print(f"Symbol: {symbol}")
-        print(f"Period: {start} to {end}")
-        print(f"Strategy: SMA Crossover (Fast: {fast_period}, Slow: {slow_period})")
-        print("=" * 80)
-        print()
+        # Print strategy header
+        self.report.print_strategy_header(
+            strategy_name="SMA Crossover Strategy",
+            symbol=symbol,
+            start=start,
+            end=end,
+            params={
+                'fast_sma': f"{fast_period}",
+                'slow_sma': f"{slow_period}"
+            }
+        )
         
         # Step 1: Load data
-        print(f"Loading data for {symbol}...")
+        self.report.print_step(f"Loading data for {symbol}...")
         try:
             data_df = self.data_engine.load_prices(
                 symbol=symbol,
                 start=start,
                 end=end
             )
-            print(f"Loaded {len(data_df)} bars of data")
-            print()
+            self.report.print_data_summary(
+                rows=len(data_df),
+                start_date=str(data_df.index[0].date()),
+                end_date=str(data_df.index[-1].date())
+            )
         except FileNotFoundError as e:
-            print(f"ERROR: {e}")
-            print(f"Please create a data file at: data/processed/{symbol}.parquet")
+            self.report.print_error(
+                "Data not found",
+                f"Create a data file at: data/processed/{symbol}.parquet"
+            )
             return
         
         # Step 2: Run backtest
-        print("Running backtest...")
-        print()
+        self.report.print_step("Running backtest...")
         results = self.backtest_engine.run_backtest(
             strategy_cls=SampleSMAStrategy,
             data_df=data_df,
@@ -74,30 +87,4 @@ class SampleRecipe(BaseRecipe):
         )
         
         # Step 3: Display results
-        print()
-        print("=" * 80)
-        print("BACKTEST RESULTS")
-        print("=" * 80)
-        print(f"Initial Portfolio Value: ${results['initial_value']:,.2f}")
-        print(f"Final Portfolio Value:   ${results['final_value']:,.2f}")
-        print(f"Profit/Loss:             ${results['pnl']:,.2f}")
-        print(f"Return:                  {results['return_pct']:.2f}%")
-        
-        # Display analyzer results if available
-        if results['analyzers']:
-            print()
-            print("Performance Metrics:")
-            print("-" * 80)
-            
-            analyzers = results['analyzers']
-            
-            if 'sharpe' in analyzers and analyzers['sharpe']:
-                print(f"Sharpe Ratio:            {analyzers['sharpe']:.3f}")
-            
-            if 'max_drawdown' in analyzers and analyzers['max_drawdown']:
-                print(f"Max Drawdown:            {analyzers['max_drawdown']:.2f}%")
-            
-            if 'total_return' in analyzers and analyzers['total_return']:
-                print(f"Total Return:            {analyzers['total_return']:.2f}%")
-        
-        print("=" * 80)
+        self.report.print_backtest_results(results)

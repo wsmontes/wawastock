@@ -3,6 +3,7 @@ Base engine module - Abstract base class for all engines.
 """
 
 from abc import ABC, abstractmethod
+from utils.logger import get_logger
 
 
 class BaseEngine(ABC):
@@ -15,6 +16,10 @@ class BaseEngine(ABC):
     
     All engines must implement the run() method.
     """
+    
+    def __init__(self):
+        """Initialize base engine with logger."""
+        self.logger = get_logger(self.__class__.__name__)
     
     @abstractmethod
     def run(self):

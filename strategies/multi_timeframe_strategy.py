@@ -98,6 +98,7 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
     
     def __init__(self):
         """Initialize strategy indicators."""
+        super().__init__()
         self.dataclose = self.datas[0].close
         self.order = None
         
@@ -174,6 +175,10 @@ class MultiTimeframeMomentumStrategy(BaseStrategy):
         
         # Position management
         if self.position:
+            # Initialize highest_price if needed
+            if self.highest_price is None:
+                self.highest_price = self.dataclose[0]
+            
             # Update highest price
             if self.dataclose[0] > self.highest_price:
                 self.highest_price = self.dataclose[0]
