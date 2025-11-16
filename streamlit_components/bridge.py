@@ -214,6 +214,7 @@ class StreamlitBridge:
             results = self.backtest_engine.run_backtest(
                 strategy_cls=strategy_cls,
                 data_df=df,
+                symbol=symbol,
                 **cleaned_params
             )
             

@@ -14,6 +14,7 @@ def setup_logger(
     rotation: str = "10 MB",
     retention: str = "7 days",
     colorize: bool = True,
+    console_output: bool = False,  # Disabled by default
 ) -> None:
     """
     Configure loguru logger with rich formatting.
@@ -24,17 +25,19 @@ def setup_logger(
         rotation: When to rotate log file (e.g., "10 MB", "1 day")
         retention: How long to keep old logs (e.g., "7 days")
         colorize: Whether to use colors in console output
+        console_output: Whether to output logs to console (default: False, only to file)
     """
     # Remove default handler
     logger.remove()
     
-    # Add console handler with rich formatting
-    logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-        level=level,
-        colorize=colorize,
-    )
+    # Add console handler only if explicitly enabled
+    if console_output:
+        logger.add(
+            sys.stderr,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+            level=level,
+            colorize=colorize,
+        )
     
     # Add file handler with rotation
     log_path = Path(log_file)

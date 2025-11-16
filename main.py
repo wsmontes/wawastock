@@ -172,50 +172,11 @@ def run_strategy(args):
     results = backtest_engine.run_backtest(
         strategy_cls=strategy_cls,
         data_df=data_df,
+        symbol=args.symbol,
         **strategy_params
     )
     
-    # Display results with rich formatting
-    console.print()
-    console.print(Panel.fit(
-        "[bold green]BACKTEST RESULTS[/bold green]",
-        border_style="green"
-    ))
-    
-    results_table = Table(box=box.ROUNDED, show_header=False)
-    results_table.add_column("Metric", style="cyan", no_wrap=True)
-    results_table.add_column("Value", style="bold")
-    
-    results_table.add_row("Initial Portfolio Value", f"[white]${results['initial_value']:,.2f}[/white]")
-    results_table.add_row("Final Portfolio Value", f"[white]${results['final_value']:,.2f}[/white]")
-    
-    pnl_color = "green" if results['pnl'] >= 0 else "red"
-    results_table.add_row("Profit/Loss", f"[{pnl_color}]${results['pnl']:,.2f}[/{pnl_color}]")
-    
-    return_color = "green" if results['return_pct'] >= 0 else "red"
-    results_table.add_row("Return", f"[{return_color}]{results['return_pct']:.2f}%[/{return_color}]")
-    
-    console.print(results_table)
-    
-    if results['analyzers']:
-        console.print()
-        perf_table = Table(title="Performance Metrics", box=box.ROUNDED)
-        perf_table.add_column("Metric", style="cyan")
-        perf_table.add_column("Value", style="bold")
-        
-        analyzers = results['analyzers']
-        
-        if 'sharpe' in analyzers and analyzers['sharpe']:
-            perf_table.add_row("Sharpe Ratio", f"{analyzers['sharpe']:.3f}")
-        
-        if 'max_drawdown' in analyzers and analyzers['max_drawdown']:
-            perf_table.add_row("Max Drawdown", f"{analyzers['max_drawdown']:.2f}%")
-        
-        if 'total_return' in analyzers and analyzers['total_return']:
-            perf_table.add_row("Total Return", f"{analyzers['total_return']:.2f}%")
-        
-        console.print(perf_table)
-    
+    # Results are already displayed by BacktestEngine
     console.print()
 
 
