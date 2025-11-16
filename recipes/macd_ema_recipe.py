@@ -8,6 +8,9 @@ indicators for higher probability trades.
 from recipes.base_recipe import BaseRecipe
 from strategies.macd_ema_strategy import MACDEMAStrategy
 from engines.report_engine import ReportEngine
+from rich.console import Console
+
+console = Console()
 
 
 class MACDEMARecipe(BaseRecipe):
@@ -49,32 +52,13 @@ class MACDEMARecipe(BaseRecipe):
             position_size_pct: Position size as % of equity (default: 0.95 = 95%)
             trail_pct: Trailing stop % (default: 0.02 = 2%)
         """
-        # Print strategy header
-        self.report.print_strategy_header(
-            strategy_name="MACD + EMA Trend Following",
-            symbol=symbol,
-            start=start,
-            end=end,
-            params={
-                'macd': f"{macd_fast}/{macd_slow}/{macd_signal}",
-                'trend_filter': f"{trend_ema} EMA",
-                'position_size': f"{position_size_pct*100:.0f}%",
-                'trailing_stop': f"{trail_pct*100:.1f}%"
-            }
-        )
-        
-        # Load data
+        # Load data first
         self.report.print_step(f"Loading data for {symbol}...")
         try:
             data_df = self.data_engine.load_prices(
                 symbol=symbol,
                 start=start,
                 end=end
-            )
-            self.report.print_data_summary(
-                rows=len(data_df),
-                start_date=str(data_df.index[0].date()),
-                end_date=str(data_df.index[-1].date())
             )
         except FileNotFoundError as e:
             self.report.print_error(
@@ -94,6 +78,21 @@ class MACDEMARecipe(BaseRecipe):
             trend_ema=trend_ema,
             position_size_pct=position_size_pct,
             trail_pct=trail_pct
+        )
+        
+        # Print strategy header with configuration
+        console.print()
+        self.report.print_strategy_header(
+            strategy_name="MACD + EMA Trend Following",
+            symbol=symbol,
+            start=start,
+            end=end,
+            params={
+                'macd': f"{macd_fast}/{macd_slow}/{macd_signal}",
+                'trend_filter': f"{trend_ema} EMA",
+                'position_size': f"{position_size_pct*100:.0f}%",
+                'trailing_stop': f"{trail_pct*100:.1f}%"
+            }
         )
         
         # Display results
