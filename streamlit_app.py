@@ -27,6 +27,10 @@ bridge = StreamlitBridge()
 with st.sidebar:
     st.header("Configuration")
     
+    # Run button at the top
+    run_btn = st.button("▶ RUN BACKTEST", use_container_width=True)
+    st.divider()
+    
     # Recipe selection
     recipes = bridge.get_recipe_registry()
     recipe = st.selectbox("Strategy", list(recipes.keys()))
@@ -112,9 +116,6 @@ with st.sidebar:
                 step=0.1,
                 format="%.2f"
             )
-    
-    st.divider()
-    run_btn = st.button("▶ RUN BACKTEST", type="primary", width="stretch")
 
 # ========== MAIN AREA ==========
 
