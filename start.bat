@@ -34,4 +34,4 @@ REM Open browser after 3 seconds
 start /b timeout /t 3 /nobreak >nul && start http://localhost:8502
 
 REM Run streamlit
-streamlit run streamlit_app.py
+streamlit run Home.py

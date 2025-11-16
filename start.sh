@@ -30,4 +30,4 @@ echo ""
 (sleep 2 && open http://localhost:8502) &
 
 # Run streamlit
-streamlit run streamlit_app.py
+streamlit run Home.py

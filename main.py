@@ -61,6 +61,111 @@ STRATEGY_REGISTRY = {
 }
 
 
+def run_recipe_programmatic(
+    recipe_name: str,
+    symbol: str = None,
+    start: str = None,
+    end: str = None,
+    cash: float = 100000.0,
+    commission: float = 0.001,
+    **kwargs
+):
+    """
+    Execute a recipe programmatically (for Streamlit/API usage).
+    
+    Args:
+        recipe_name: Name of the recipe to run
+        symbol: Stock/crypto symbol
+        start: Start date (YYYY-MM-DD)
+        end: End date (YYYY-MM-DD)
+        cash: Initial capital
+        commission: Commission rate
+        **kwargs: Additional parameters passed to recipe
+    
+    Returns:
+        Dictionary with backtest results
+    """
+    if recipe_name not in RECIPE_REGISTRY:
+        raise ValueError(f"Recipe '{recipe_name}' not found. Available: {', '.join(RECIPE_REGISTRY.keys())}")
+    
+    # Initialize engines
+    data_engine = DataEngine()
+    backtest_engine = BacktestEngine(
+        initial_cash=cash,
+        commission=commission
+    )
+    
+    # Get recipe class and instantiate
+    recipe_cls = RECIPE_REGISTRY[recipe_name]
+    recipe = recipe_cls(data_engine, backtest_engine)
+    
+    # Run recipe with parameters
+    run_kwargs = {}
+    if symbol:
+        run_kwargs['symbol'] = symbol
+    if start:
+        run_kwargs['start'] = start
+    if end:
+        run_kwargs['end'] = end
+    run_kwargs.update(kwargs)
+    
+    # Run recipe - this calls backtest_engine.run_backtest() internally
+    # which returns results dict
+    recipe.run(**run_kwargs)
+    
+    # The recipe.run() doesn't return anything, but backtest_engine.run_backtest() 
+    # was called internally. We need to capture those results.
+    # Let's check if recipe has a results attribute or we need to run differently
+    
+    # Actually, recipes don't store results. Let me look at how they work...
+    # For now, let's load the data and run the backtest manually to get results
+    
+    # Load data
+    df = data_engine.load_prices(
+        symbol=symbol,
+        start=start,
+        end=end
+    )
+    
+    if df is None or df.empty:
+        raise ValueError(f"No data available for {symbol}")
+    
+    # Get the strategy class from the recipe
+    # This is a bit hacky but necessary since recipes don't return results
+    strategy_cls = None
+    for name, strat_cls in STRATEGY_REGISTRY.items():
+        if name in recipe_name or recipe_cls.__name__.replace('Recipe', '').lower() in name:
+            strategy_cls = strat_cls
+            break
+    
+    if strategy_cls is None:
+        # Try to get from recipe mapping
+        recipe_strategy_map = {
+            'sample': SampleSMAStrategy,
+            'rsi': RSIStrategy,
+            'macd_ema': MACDEMAStrategy,
+            'bollinger_rsi': BollingerRSIStrategy,
+            'multi_timeframe': MultiTimeframeMomentumStrategy,
+        }
+        strategy_cls = recipe_strategy_map.get(recipe_name)
+    
+    if strategy_cls is None:
+        raise ValueError(f"Could not determine strategy for recipe '{recipe_name}'")
+    
+    # Run backtest and get results
+    results = backtest_engine.run_backtest(
+        strategy_cls=strategy_cls,
+        data_df=df,
+        symbol=symbol,
+        **kwargs
+    )
+    
+    # Add data for chart
+    results['data'] = df
+    
+    return results
+
+
 def run_recipe(args):
     """
     Execute a recipe by name.

@@ -143,6 +143,7 @@ class StreamlitBridge:
     ) -> Optional[Dict[str, Any]]:
         """
         Run a recipe and return formatted results.
+        Uses main.py's run_recipe_programmatic to ensure consistency.
         
         Args:
             recipe_name: Name of the recipe to run
@@ -157,68 +158,21 @@ class StreamlitBridge:
             Dictionary with backtest results or None if failed
         """
         try:
-            # Create backtest engine with custom parameters
-            self.backtest_engine = BacktestEngine(
-                initial_cash=initial_cash,
-                commission=commission
-            )
+            # Import the programmatic runner from main.py
+            from main import run_recipe_programmatic
             
-            # Get recipe class
-            registry = self.get_recipe_registry()
-            if recipe_name not in registry:
-                st.error(f"Recipe '{recipe_name}' not found")
-                return None
-            
-            recipe_cls = registry[recipe_name]
-            
-            # Instantiate recipe
-            recipe = recipe_cls(self.data_engine, self.backtest_engine)
-            
-            # Prepare kwargs
-            kwargs = {
-                'symbol': symbol,
-                'start': start,
-                'end': end,
-            }
-            kwargs.update(strategy_params)
-            
-            # Run recipe (captures results internally)
-            # Note: Recipes don't return results directly, they run backtest
-            # We'll need to capture the backtest results
-            
-            # Load data first
-            df = self.load_data(symbol, start, end)
-            if df is None or df.empty:
-                st.error(f"No data available for {symbol}")
-                return None
-            
-            # Get strategy from recipe
-            # This is recipe-specific, we'll need to handle this
-            # For now, let's run the backtest directly
-            
-            # Get the strategy class from the recipe
-            strategy_cls = self._get_strategy_from_recipe(recipe_name)
-            if strategy_cls is None:
-                st.error("Could not determine strategy for recipe")
-                return None
-            
-            # Convert float params to int if they are whole numbers (periods, etc)
-            cleaned_params = {}
-            for key, value in strategy_params.items():
-                if isinstance(value, float) and value.is_integer():
-                    cleaned_params[key] = int(value)
-                else:
-                    cleaned_params[key] = value
-            
-            # Run backtest
-            results = self.backtest_engine.run_backtest(
-                strategy_cls=strategy_cls,
-                data_df=df,
+            # Call main.py's function directly - NO DUPLICATION
+            results = run_recipe_programmatic(
+                recipe_name=recipe_name,
                 symbol=symbol,
-                **cleaned_params
+                start=start,
+                end=end,
+                cash=initial_cash,
+                commission=commission,
+                **strategy_params
             )
             
-            return self._format_results(results, symbol, start, end, df)
+            return results
             
         except Exception as e:
             st.error(f"Error running backtest: {str(e)}")
