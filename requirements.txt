@@ -1,0 +1,18 @@
+# Core dependencies
+backtrader
+pandas
+pyarrow
+duckdb
+
+# Data sources (optional - install as needed)
+# Yahoo Finance
+yfinance
+
+# Binance
+python-binance
+
+# Alpaca
+alpaca-py
+
+# CCXT (100+ exchanges)
+ccxt
