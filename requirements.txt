@@ -7,6 +7,11 @@ duckdb
 loguru
 rich
 
+# Streamlit UI
+streamlit>=1.30.0
+plotly>=5.18.0
+streamlit-aggrid>=0.3.4
+
 # Data sources (optional - install as needed)
 # Yahoo Finance
 yfinance

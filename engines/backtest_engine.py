@@ -65,6 +65,7 @@ class BacktestEngine(BaseEngine):
         cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
         cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
         cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+        cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
         
         return cerebro
     
@@ -187,6 +188,12 @@ class BacktestEngine(BaseEngine):
             if hasattr(strategy.analyzers, 'returns'):
                 ret_analysis = strategy.analyzers.returns.get_analysis()
                 analyzers_results['total_return'] = ret_analysis.get('rtot', None)
+            
+            if hasattr(strategy.analyzers, 'trades'):
+                trade_analysis = strategy.analyzers.trades.get_analysis()
+                analyzers_results['total_trades'] = trade_analysis.get('total', {}).get('total', 0)
+                analyzers_results['won_trades'] = trade_analysis.get('won', {}).get('total', 0)
+                analyzers_results['lost_trades'] = trade_analysis.get('lost', {}).get('total', 0)
         
         # Return results
         return {
