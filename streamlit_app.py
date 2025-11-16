@@ -118,7 +118,6 @@ if run_btn:
             )
             
             st.session_state['results'] = results
-            st.success("Backtest completed!")
         
         except Exception as e:
             st.error(f"Error: {str(e)}")
@@ -127,6 +126,13 @@ if run_btn:
 # Display results
 if 'results' in st.session_state:
     results = st.session_state['results']
+    
+    # Symbol header with information
+    st.markdown(f"""
+    **{symbol}** · {results.get('period', 'N/A')} · Strategy: {recipe}
+    """)
+    st.caption(f"Initial Capital: ${capital:,.0f} · Commission: {commission}% · Total Bars: {len(results.get('data', [])) if results.get('data') is not None else 0}")
+    st.divider()
     
     # Metrics row
     st.subheader("Results")
