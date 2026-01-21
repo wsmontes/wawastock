@@ -8,6 +8,8 @@ from .rsi_strategy import RSIStrategy
 from .macd_ema_strategy import MACDEMAStrategy
 from .bollinger_rsi_strategy import BollingerRSIStrategy
 from .multi_timeframe_strategy import MultiTimeframeMomentumStrategy
+from .btc_adaptive_hold import BTCAdaptiveHold
+from .btc_winning_v2 import BTCWinningV2
 
 __all__ = [
     'BaseStrategy',
@@ -15,5 +17,7 @@ __all__ = [
     'RSIStrategy',
     'MACDEMAStrategy',
     'BollingerRSIStrategy',
-    'MultiTimeframeMomentumStrategy'
+    'MultiTimeframeMomentumStrategy',
+    'BTCAdaptiveHold',
+    'BTCWinningV2',
 ]

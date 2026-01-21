@@ -71,3 +71,6 @@ class MyStrategy(BaseStrategy):
 - New engines → `engines/`
 - New recipes → `recipes/`
 - Data sources → `engines/data_sources/`
+
+
+IMPORTANT: fix is different from simplification. Keep logic intact while improving code quality.

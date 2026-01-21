@@ -30,6 +30,9 @@ from recipes.rsi_recipe import RSIRecipe
 from recipes.macd_ema_recipe import MACDEMARecipe
 from recipes.bollinger_rsi_recipe import BollingerRSIRecipe
 from recipes.multi_timeframe_recipe import MultiTimeframeRecipe
+from recipes.btc_optuna_recipe import BTCOptunaRecipe
+from recipes.neural_optuna_recipe import NeuralOptunaRecipe
+from recipes.regime_optuna_recipe import RegimeOptunaRecipe
 
 # Import strategies
 from strategies.sample_sma_strategy import SampleSMAStrategy
@@ -37,6 +40,9 @@ from strategies.rsi_strategy import RSIStrategy
 from strategies.macd_ema_strategy import MACDEMAStrategy
 from strategies.bollinger_rsi_strategy import BollingerRSIStrategy
 from strategies.multi_timeframe_strategy import MultiTimeframeMomentumStrategy
+from strategies.btc_adaptive_strategy import BTCAdaptiveStrategy
+from strategies.neural_trading_strategy import NeuralTradingStrategy
+from strategies.regime_trading_strategy import RegimeTradingStrategy
 
 # Initialize console and logger
 console = Console()
@@ -50,6 +56,9 @@ RECIPE_REGISTRY = {
     'macd_ema': MACDEMARecipe,
     'bollinger_rsi': BollingerRSIRecipe,
     'multi_timeframe': MultiTimeframeRecipe,
+    'btc_optuna': BTCOptunaRecipe,
+    'neural_optuna': NeuralOptunaRecipe,
+    'regime_optuna': RegimeOptunaRecipe,
 }
 
 STRATEGY_REGISTRY = {
@@ -58,6 +67,9 @@ STRATEGY_REGISTRY = {
     'macd_ema': MACDEMAStrategy,
     'bollinger_rsi': BollingerRSIStrategy,
     'multi_timeframe': MultiTimeframeMomentumStrategy,
+    'btc_adaptive': BTCAdaptiveStrategy,
+    'neural': NeuralTradingStrategy,
+    'regime': RegimeTradingStrategy,
 }
 
 
@@ -109,16 +121,14 @@ def run_recipe_programmatic(
         run_kwargs['end'] = end
     run_kwargs.update(kwargs)
     
-    # Run recipe - this calls backtest_engine.run_backtest() internally
-    # which returns results dict
-    recipe.run(**run_kwargs)
+    # Run recipe - capture results if recipe returns them
+    results = recipe.run(**run_kwargs)
     
-    # The recipe.run() doesn't return anything, but backtest_engine.run_backtest() 
-    # was called internally. We need to capture those results.
-    # Let's check if recipe has a results attribute or we need to run differently
+    # If recipe returns results dict (like BTCOptunaRecipe), return it
+    if results:
+        return results
     
-    # Actually, recipes don't store results. Let me look at how they work...
-    # For now, let's load the data and run the backtest manually to get results
+    # Otherwise, for backward compatibility, load data and run backtest manually
     
     # Load data
     df = data_engine.load_prices(

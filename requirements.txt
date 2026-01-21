@@ -7,6 +7,12 @@ duckdb
 loguru
 rich
 
+# Machine Learning / Deep Learning
+torch
+scikit-learn
+optuna
+ta
+
 # Streamlit UI
 streamlit>=1.30.0
 plotly>=5.18.0

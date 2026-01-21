@@ -63,3 +63,12 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Trading results and models (transient data)
+*.csv
+*.pkl
+*.pt
+logs/
+outputs/
+data/models/
+data/*.pkl

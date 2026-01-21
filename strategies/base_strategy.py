@@ -22,6 +22,7 @@ class BaseStrategy(bt.Strategy):
         """Initialize base strategy with logger."""
         super().__init__()
         self.logger = get_logger(self.__class__.__name__)
+        self.trade_log = []  # Rastrear trades para análise de perdas consecutivas
     
     def log(self, txt, dt=None):
         """
@@ -64,3 +65,11 @@ class BaseStrategy(bt.Strategy):
             return
         
         self.log(f'TRADE PROFIT, GROSS: {trade.pnl:.2f}, NET: {trade.pnlcomm:.2f}')
+        
+        # Registrar trade para análise
+        self.trade_log.append({
+            'pnl': trade.pnlcomm,
+            'gross': trade.pnl,
+            'size': trade.size,
+            'value': trade.value
+        })
